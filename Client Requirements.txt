@@ -1,6 +1,5 @@
 Notes:
 
-
 Client Requirements:
 
 A procedural maze / puzzle game.
@@ -9,17 +8,13 @@ Collectable items or keys that unlock doors.
 Made in the Godot Engine.
 
 
-
 Abstraction into goals:
 
-Create a player movement system. 
-
-Create a level / gridmap system. (Ask client on Discord about square grid vs hexagonal grid and what scale)
-
-Create a series of assets (corridors, intersections, dead-ends, etc.) to use in the gridmap. (Ask client about visual style.)
-
-Create a door / key system. (Ask client whether to use scalable inventory system or a series of booleans).
-
-Create a script that fills in the maze. (Would likely create paths instead of placing randomly)
-
+Create a player input and movement system.
+Create a door / key system. (Ask client whether to use scalable inventory system or a series of booleans, whether key's are 1 time use, etc)
+Ask client whether there should be items like lanterns and flash lights.
 Create the visuals. (Fog, shaders, lighting, that sort of thing)
+
+Create a level / gridmap system. (Ask client about square grid vs hexagonal grid and what grid scale, etc)
+Create a series of assets (corridors, intersections, dead-ends, etc) to use in the gridmap. (Ask client about visual style)
+Create a script that fills in the maze. (Would likely create paths instead of placing randomly to make sure everything is solvable)
