@@ -1,4 +1,4 @@
-# The GDShader source code is from https://binbun3d.itch.io/godot-skies, hwere it is labelled as CC0.
+// The GDShader source code is from https://binbun3d.itch.io/godot-skies, hwere it is labelled as CC0.
 
 shader_type sky;
 

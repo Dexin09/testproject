@@ -1,10 +1,11 @@
 [gd_scene format=3 uid="uid://bg5es2uf7hrci"]
 
-[ext_resource type="MeshLibrary" uid="uid://b7rx4ku48ca7v" path="res://level/meshlibs/walls.meshlib" id="1_5gx2l"]
-[ext_resource type="MeshLibrary" uid="uid://gdhsm35jaebo" path="res://level/meshlibs/floors.meshlib" id="2_5gx2l"]
 [ext_resource type="Shader" uid="uid://kgjsu8n7pyom" path="res://visuals/shader/main.gdshader" id="3_ktfr2"]
 [ext_resource type="Texture2D" uid="uid://cuk3etwx1exvn" path="res://visuals/textures/clouds/clouds_06.tres" id="4_44x8d"]
+[ext_resource type="MeshLibrary" uid="uid://gdhsm35jaebo" path="res://level/meshlibs/floors.meshlib" id="4_ktfr2"]
+[ext_resource type="MeshLibrary" uid="uid://b7rx4ku48ca7v" path="res://level/meshlibs/walls.meshlib" id="5_44x8d"]
 [ext_resource type="Texture2D" uid="uid://de68x5ujqbcqu" path="res://visuals/textures/clouds/clouds_07.tres" id="5_ivpvi"]
+[ext_resource type="Script" uid="uid://bfmcgosrn18jd" path="res://level/wall_generator.gd" id="6_44x8d"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_0v1st"]
 shader = ExtResource("3_ktfr2")
@@ -44,23 +45,6 @@ sky = SubResource("Sky_57qmd")
 
 [node name="Level" type="Node3D" unique_id=350795594]
 
-[node name="WallGridMap" type="GridMap" parent="." unique_id=1631333571]
-mesh_library = ExtResource("1_5gx2l")
-cell_size = Vector3(2, 3, 2)
-cell_center_y = false
-data = {
-"cells": PackedInt32Array(65533, 0, 1048626, 65533, 3, 655410, 65533, 1, 655390, 65533, 2, 655390, 65534, 0, 1048606, 65535, 0, 1048606, 65534, 3, 1441822, 65535, 3, 1441822, 6, 0, 86, 5, 0, 66, 4, 0, 66, 3, 0, 66, 2, 1, 1441858, 2, 0, 655386, 0, 0, 1048606, 1, 0, 50, 0, 3, 1441822, 1, 3, 1441842, 1, 1, 30)
-}
-
-[node name="FloorGridMap" type="GridMap" parent="." unique_id=871037393]
-mesh_library = ExtResource("2_5gx2l")
-cell_size = Vector3(2, 3, 2)
-cell_center_y = false
-data = {
-"cells": PackedInt32Array(0, 0, 1441806, 65535, 0, 1441806, 65534, 0, 1441806, 65533, 0, 1441806, 65533, 1, 1441806, 65534, 1, 1441806, 65535, 1, 1441806, 0, 1, 1441806, 0, 2, 1441806, 65535, 2, 1441806, 65534, 2, 1441806, 65533, 2, 1441806, 65533, 3, 1441806, 65534, 3, 1441806, 65535, 3, 1441806, 0, 3, 1441806, 1, 2, 655374, 1, 1, 655374, 2, 2, 1441797, 3, 1, 1441797, 2, 1, 1441797, 3, 2, 1441797, 1, 3, 655374, 2, 3, 1441797, 3, 3, 1441797, 1, 0, 655374, 2, 0, 1441797, 3, 0, 1441797, 4, 0, 1441797, 4, 1, 1441797, 4, 2, 1441797, 4, 3, 1441797, 5, 3, 1441797, 6, 3, 1441797, 6, 2, 1441797, 6, 1, 1441797, 5, 1, 1441797, 5, 2, 1441797, 5, 0, 1441797, 6, 0, 1441797, 131069, 3, 1441826)
-}
-metadata/_editor_floor_ = Vector3(0, 1, 0)
-
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1048499932]
 environment = SubResource("Environment_yf5fn")
 
@@ -69,3 +53,26 @@ transform = Transform3D(1, 0, 0, 0, 0.8660254, 0.50000006, 0, -0.50000006, 0.866
 light_color = Color(1, 0.8784314, 0.7529412, 1)
 light_energy = 4.0
 shadow_enabled = true
+
+[node name="FloorGridMap" type="GridMap" parent="." unique_id=1790400397]
+mesh_library = ExtResource("4_ktfr2")
+cell_size = Vector3(2, 3, 2)
+cell_center_y = false
+data = {
+"cells": PackedInt32Array(65535, 1, 12, 65535, 0, 12, 0, 0, 12, 0, 1, 12, 65534, 0, 12, 65534, 65535, 12, 65535, 65535, 12, 0, 65535, 12, 1, 0, 12, 1, 1, 12, 1, 2, 12, 0, 2, 12, 65535, 2, 12, 65534, 2, 12, 65534, 1, 12, 1, 65535, 12, 1, 65534, 12, 0, 65534, 12, 65535, 65534, 12, 65534, 65534, 12, 65533, 65534, 12, 65533, 65535, 12, 65533, 0, 12, 65533, 1, 12, 65533, 2, 12, 2, 0, 12, 3, 0, 12, 3, 65535, 12, 3, 65534, 12, 3, 65533, 12, 3, 65532, 12, 2, 65532, 12, 1, 65532, 12, 1, 65533, 12, 65535, 3, 12, 65535, 4, 12, 65535, 5, 12, 0, 5, 12, 0, 6, 12, 1, 6, 12, 65532, 1, 12, 65531, 1, 12, 65530, 1, 12, 65530, 0, 12, 65531, 0, 12, 65532, 0, 12, 65529, 0, 12, 4, 65531, 12)
+}
+
+[node name="WallGridMap" type="GridMap" parent="." unique_id=1576911181]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, -1)
+mesh_library = ExtResource("5_44x8d")
+cell_size = Vector3(2, 3, 2)
+cell_center_y = false
+
+[node name="GridMapGenerator" type="Node" parent="." unique_id=1847106191 node_paths=PackedStringArray("floor_gridmap", "wall_gridmap")]
+script = ExtResource("6_44x8d")
+floor_gridmap = NodePath("../FloorGridMap")
+wall_gridmap = NodePath("../WallGridMap")
+metadata/_custom_type_script = "uid://bfmcgosrn18jd"
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=4323772]
+transform = Transform3D(1, -1.4901161e-07, 0, 1.0536712e-07, 0.70710677, 0.70710677, -1.0536712e-07, -0.70710677, 0.70710677, 0, 16, 16)
