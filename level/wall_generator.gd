@@ -1,33 +1,29 @@
 class_name WallGenerator
-extends Node
+extends Node3D
 
-@export_group("GridMaps")
 @export var floor_gridmap: GridMap
 @export var wall_gridmap: GridMap
 
-@export_group("Tile IDs")
 @export var WALL_ITEM_ID: int = 51
 @export var CORNER_ITEM_ID: int = 11
 @export var INNER_CORNER_ITEM_ID: int = 11 # Set to a separate ID if inner corners require a flipped mesh
 @export var CROSS_ITEM_ID: int = 33         # Cross/X wall tile for diagonal intersections
 
-@export_group("Straight Rotations")
+@export_group("Rotations")
 @export_enum("0:0", "90:90", "180:180", "270:270") var straight_horizontal: int = 90
 @export_enum("0:0", "90:90", "180:180", "270:270") var straight_vertical: int = 180
 
-@export_group("Corner Rotations")
 @export_enum("0:0", "90:90", "180:180", "270:270") var corner_top_left: int = 90
 @export_enum("0:0", "90:90", "180:180", "270:270") var corner_top_right: int = 0
 @export_enum("0:0", "90:90", "180:180", "270:270") var corner_bottom_right: int = 270
 @export_enum("0:0", "90:90", "180:180", "270:270") var corner_bottom_left: int = 180
 
-@export_group("Cross Rotations")
-@export_enum("0:0", "90:90", "180:180", "270:270") var cross_diagonal_1: int = 0   # TL + BR
-@export_enum("0:0", "90:90", "180:180", "270:270") var cross_diagonal_2: int = 90  # TR + BL
+@export_enum("0:0", "90:90", "180:180", "270:270") var cross_diagonal_1: int = 0 
+@export_enum("0:0", "90:90", "180:180", "270:270") var cross_diagonal_2: int = 90
 
 var floor_cells: Dictionary = {}
 
-func _ready() -> void:
+func run() -> void:
 	if wall_gridmap and floor_gridmap:
 		var cell_size := floor_gridmap.cell_size
 		wall_gridmap.position = floor_gridmap.position - Vector3(cell_size.x * 0.5, 0, cell_size.z * 0.5)
