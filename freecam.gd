@@ -2,7 +2,7 @@ class_name Freecam
 extends Camera3D
 
 @export var move_speed: float = 10.0
-@export var sprint_speed: float = 25.0
+@export var sprint_speed: float = 30.0
 @export var mouse_sensitivity: float = 0.003
 @export var capture_mouse_on_start: bool = true
 
@@ -38,6 +38,6 @@ func _process(delta: float) -> void:
 
 	var input_2d = Input.get_vector("move_left", "move_right", "move_forwards", "move_backwards")
 	var direction = (global_transform.basis * Vector3(input_2d.x, 0.0, input_2d.y)).normalized()
-	var speed = move_speed #sprint_speed if Input.is_action_pressed("sprint") else move_speed
+	var speed = sprint_speed if Input.is_action_pressed("sprint") else move_speed
 
 	global_position += direction * speed * delta

@@ -1,60 +1,17 @@
 [gd_scene format=3 uid="uid://bg5es2uf7hrci"]
 
-[ext_resource type="Shader" uid="uid://kgjsu8n7pyom" path="res://visuals/shader/main.gdshader" id="3_ktfr2"]
-[ext_resource type="Texture2D" uid="uid://cuk3etwx1exvn" path="res://visuals/textures/clouds/clouds_06.tres" id="4_44x8d"]
 [ext_resource type="MeshLibrary" uid="uid://gdhsm35jaebo" path="res://level/meshlibs/floors.meshlib" id="4_ktfr2"]
 [ext_resource type="MeshLibrary" uid="uid://b7rx4ku48ca7v" path="res://level/meshlibs/walls.meshlib" id="5_44x8d"]
-[ext_resource type="Texture2D" uid="uid://de68x5ujqbcqu" path="res://visuals/textures/clouds/clouds_07.tres" id="5_ivpvi"]
 [ext_resource type="Script" uid="uid://bfmcgosrn18jd" path="res://level/wall_generator.gd" id="6_44x8d"]
 [ext_resource type="Script" uid="uid://dnvsorrc7j0r8" path="res://level/layout_generator.gd" id="6_ivpvi"]
 [ext_resource type="Script" uid="uid://ce70j5d0prvsl" path="res://freecam.gd" id="8_0v1st"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_0v1st"]
-shader = ExtResource("3_ktfr2")
-shader_parameter/sky_day = Color(0, 0.3, 0.7, 1)
-shader_parameter/horizon_day = Color(0.75, 0.85, 0.85, 1)
-shader_parameter/horizon_sunset = Color(0.9, 0.4, 0.1, 1)
-shader_parameter/sky_sunset = Color(0.15, 0.2, 0.4, 1)
-shader_parameter/horizon_night = Color(0.1, 0.15, 0.2, 1)
-shader_parameter/sky_night = Color(0.05, 0.1, 0.15, 1)
-shader_parameter/day_night_mix = 0.8
-shader_parameter/use_directional_light = true
-shader_parameter/horizon_exponent = 2.0
-shader_parameter/sunset_amount_exponent = 0.7
-shader_parameter/night_amount_exponent = 4.0
-shader_parameter/cloud_tex_01 = ExtResource("4_44x8d")
-shader_parameter/cloud_tex_02 = ExtResource("5_ivpvi")
-shader_parameter/cloud_color = Color(0.8, 0.8, 0.8, 1)
-shader_parameter/cloud_tiling = Vector2(1, 1)
-shader_parameter/wind_speed = Vector2(0.125, 0.25)
-shader_parameter/cloud_density = 0.7
-shader_parameter/cloud_depth = 2.0
-shader_parameter/cloud_shape_exponent = 2.0
-shader_parameter/cloud_occlude_exponent = 1.0
-shader_parameter/sun_scale = 0.05
-shader_parameter/sun_strength = 15.0
-shader_parameter/sun_color = Color(1, 0.9, 0, 1)
-shader_parameter/moon_scale = 0.03
-shader_parameter/moon_strength = 15.0
-shader_parameter/moon_color = Color(0.5, 0.55, 0.7, 1)
-
-[sub_resource type="Sky" id="Sky_57qmd"]
-sky_material = SubResource("ShaderMaterial_0v1st")
-
 [sub_resource type="Environment" id="Environment_yf5fn"]
-background_mode = 2
-sky = SubResource("Sky_57qmd")
 
 [node name="Level" type="Node3D" unique_id=350795594]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1048499932]
 environment = SubResource("Environment_yf5fn")
-
-[node name="DirectionalLight" type="DirectionalLight3D" parent="." unique_id=513639739]
-transform = Transform3D(1, 0, 0, 0, 0.9659258, 0.2588191, 0, -0.2588191, 0.9659258, 0, 0, 0)
-light_color = Color(1, 0.8784314, 0.7529412, 1)
-light_energy = 4.0
-shadow_enabled = true
 
 [node name="FloorGridMap" type="GridMap" parent="." unique_id=1790400397]
 mesh_library = ExtResource("4_ktfr2")
@@ -86,3 +43,7 @@ metadata/_custom_type_script = "uid://bfmcgosrn18jd"
 [node name="Freecam" type="Camera3D" parent="." unique_id=1450178939]
 script = ExtResource("8_0v1st")
 metadata/_custom_type_script = "uid://ce70j5d0prvsl"
+
+[node name="OmniLight" type="OmniLight3D" parent="Freecam" unique_id=1172728830]
+shadow_enabled = true
+omni_range = 64.0
