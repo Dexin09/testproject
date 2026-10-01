@@ -4,14 +4,20 @@ extends Node3D
 @export_group("GridMaps")
 @export var floor_gridmap: GridMap
 @export var wall_gridmap: GridMap
-@export var roof_gridmap: GridMap ## Optional: Target for roofs. If empty, pastes roofs directly into floor_gridmap.
+@export var roof_gridmap: GridMap
 
 @export_group("Tiles")
 @export var WALL_ITEM_ID: int = 51
 @export var CORNER_ITEM_ID: int = 11
-@export var INNER_CORNER_ITEM_ID: int = 11 # Set to a separate ID if inner corners require a flipped mesh
-@export var CROSS_ITEM_ID: int = 31         # Cross/X wall tile for diagonal intersections
-@export var slope_item_ids: Array[int] = [] ## Add slope/ramp Tile IDs here. Walls will leave openings for them.
+@export var INNER_CORNER_ITEM_ID: int = 11
+@export var CROSS_ITEM_ID: int = 31
+@export var ROOF_ITEM_ID: int = -1
+@export var slope_floor_item_id: int = 33
+@export var slope_item_ids: Array[int] = []
+
+@export_group("Roof/Ceiling Settings")
+@export var inherit_floor_orientation: bool = true
+@export_range(0, 23) var default_roof_orientation: int = 0
 
 @export_group("Rotations")
 @export_enum("0:0", "90:90", "180:180", "270:270") var straight_horizontal: int = 90
@@ -34,7 +40,7 @@ func run() -> void:
 		if wall_gridmap:
 			wall_gridmap.position = floor_gridmap.position - Vector3(cell_size.x * 0.5, 0, cell_size.z * 0.5)
 		if roof_gridmap:
-			roof_gridmap.position = floor_gridmap.position # Roofs share exact cell alignment with floors
+			roof_gridmap.position = floor_gridmap.position
 
 	create_floors()
 	create_walls()
@@ -43,12 +49,46 @@ func run() -> void:
 
 func create_floors() -> void:
 	floor_cells.clear()
-	if floor_gridmap:
-		for cell in floor_gridmap.get_used_cells():
-			floor_cells[cell] = {
-				"item": floor_gridmap.get_cell_item(cell),
-				"orientation": floor_gridmap.get_cell_item_orientation(cell)
-			}
+	if not floor_gridmap:
+		return
+
+	for cell in floor_gridmap.get_used_cells():
+		var item_id := floor_gridmap.get_cell_item(cell)
+		var is_slope := (item_id == slope_floor_item_id) or (item_id in slope_item_ids)
+		floor_cells[cell] = {
+			"item": item_id,
+			"orientation": floor_gridmap.get_cell_item_orientation(cell),
+			"is_slope": is_slope,
+			"is_virtual": false
+		}
+
+	var virtual_cells: Dictionary = {}
+
+	for cell: Vector3i in floor_cells.keys():
+		var data: Dictionary = floor_cells[cell]
+		if data["is_slope"]:
+			var dir_3d := _get_slope_dir(data["orientation"])
+
+			var top_upper := cell
+			var bot_upper := cell + dir_3d
+
+			var top_lower := cell + Vector3i(0, -1, 0)
+			var bot_lower := cell + dir_3d + Vector3i(0, -1, 0)
+
+			var footprint := [top_upper, bot_upper, top_lower, bot_lower]
+
+			for f_cell in footprint:
+				if not floor_cells.has(f_cell):
+					virtual_cells[f_cell] = {
+						"item": -1,
+						"orientation": data["orientation"],
+						"is_slope": false,
+						"is_virtual": true
+					}
+
+	for v_cell in virtual_cells:
+		if not floor_cells.has(v_cell):
+			floor_cells[v_cell] = virtual_cells[v_cell]
 
 
 func create_walls() -> void:
@@ -57,7 +97,6 @@ func create_walls() -> void:
 		
 	wall_gridmap.clear()
 
-	# Collect Y-levels and their respective 2D X/Z bounds
 	var levels: Dictionary = {}
 
 	for cell: Vector3i in floor_cells.keys():
@@ -74,7 +113,6 @@ func create_walls() -> void:
 			bounds["max"].x = maxi(bounds["max"].x, cell.x)
 			bounds["max"].y = maxi(bounds["max"].y, cell.z)
 
-	# Generate walls for each floor level independently
 	for wy in levels.keys():
 		var bounds: Dictionary = levels[wy]
 		var min_pos: Vector2i = bounds["min"]
@@ -97,30 +135,53 @@ func create_roofs() -> void:
 		roof_gridmap.clear()
 		
 	for cell: Vector3i in floor_cells.keys():
+		var data: Dictionary = floor_cells[cell]
 		var roof_pos := cell + Vector3i(0, 1, 0)
 		
-		# Can't overwrite existing floors
 		if not floor_cells.has(roof_pos):
-			var data: Dictionary = floor_cells[cell]
-			target_map.set_cell_item(roof_pos, data["item"], data["orientation"])
+			var roof_item := _get_roof_item_id(data, cell)
+			if roof_item != -1:
+				var orient: int = default_roof_orientation
+				var is_slope_related: bool = data.get("is_slope", false) or data.get("is_virtual", false)
+				if inherit_floor_orientation and data.has("orientation") and not is_slope_related:
+					orient = data["orientation"]
+				target_map.set_cell_item(roof_pos, roof_item, orient)
 
 
 func _has_floor(x: int, y: int, z: int) -> bool:
-	var pos := Vector3i(x, y, z)
-	if floor_cells.has(pos):
-		return true
-		
-	# Slope accommodation: if the cell directly above or below is a slope, 
-	# treat this level as continuous so we don't spawn a blocking wall across the ramp.
-	var below := Vector3i(x, y - 1, z)
-	if floor_cells.has(below) and floor_cells[below]["item"] in slope_item_ids:
-		return true
-		
-	var above := Vector3i(x, y + 1, z)
-	if floor_cells.has(above) and floor_cells[above]["item"] in slope_item_ids:
-		return true
+	return floor_cells.has(Vector3i(x, y, z))
 
-	return false
+
+func _get_slope_dir(orientation: int) -> Vector3i:
+	var gmap := wall_gridmap if wall_gridmap else floor_gridmap
+	if gmap:
+		var basis := gmap.get_basis_with_orthogonal_index(orientation)
+		var dir := -basis.x
+		return Vector3i(roundi(dir.x), 0, roundi(dir.z))
+	return Vector3i(0, 0, 1)
+
+
+func _get_roof_item_id(data: Dictionary, cell_pos: Vector3i = Vector3i.ZERO) -> int:
+	if ROOF_ITEM_ID != -1:
+		return ROOF_ITEM_ID
+	var item: int = data.get("item", -1)
+	if item != -1 and item != slope_floor_item_id and not item in slope_item_ids:
+		return item
+
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			var neighbor_pos := cell_pos + Vector3i(dx, 0, dz)
+			if floor_cells.has(neighbor_pos):
+				var n_item: int = floor_cells[neighbor_pos].get("item", -1)
+				if n_item != -1 and n_item != slope_floor_item_id and not n_item in slope_item_ids:
+					return n_item
+
+	for c in floor_cells:
+		var f_item: int = floor_cells[c].get("item", -1)
+		if f_item != -1 and f_item != slope_floor_item_id and not f_item in slope_item_ids:
+			return f_item
+
+	return WALL_ITEM_ID
 
 
 func _place_wall_tile_at_corner(wx: int, wy: int, wz: int) -> void:

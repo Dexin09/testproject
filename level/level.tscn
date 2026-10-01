@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://de68x5ujqbcqu" path="res://visuals/textures/clouds/clouds_07.tres" id="5_ivpvi"]
 [ext_resource type="Script" uid="uid://bfmcgosrn18jd" path="res://level/wall_generator.gd" id="6_44x8d"]
 [ext_resource type="Script" uid="uid://dnvsorrc7j0r8" path="res://level/layout_generator.gd" id="6_ivpvi"]
+[ext_resource type="Script" uid="uid://ce70j5d0prvsl" path="res://freecam.gd" id="8_0v1st"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_0v1st"]
 shader = ExtResource("3_ktfr2")
@@ -73,7 +74,7 @@ cell_center_y = false
 script = ExtResource("6_ivpvi")
 floor_gridmap = NodePath("../FloorGridMap")
 wall_generator = NodePath("../WallGenerator")
-camera = NodePath("../Node3D")
+camera = NodePath("../Freecam")
 metadata/_custom_type_script = "uid://dnvsorrc7j0r8"
 
 [node name="WallGenerator" type="Node3D" parent="." unique_id=1301470454 node_paths=PackedStringArray("floor_gridmap", "wall_gridmap")]
@@ -82,10 +83,6 @@ floor_gridmap = NodePath("../FloorGridMap")
 wall_gridmap = NodePath("../WallGridMap")
 metadata/_custom_type_script = "uid://bfmcgosrn18jd"
 
-[node name="Node3D" type="Node3D" parent="." unique_id=755419796]
-transform = Transform3D(0.7071068, 0.6830129, -0.18301275, -3.8567043e-09, 0.2588191, 0.96592593, 0.7071068, -0.68301266, 0.18301272, 0, 0, 0)
-
-[node name="Camera3D" type="Camera3D" parent="Node3D" unique_id=215123490]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 384)
-fov = 15.0
-size = 256.0
+[node name="Freecam" type="Camera3D" parent="." unique_id=1450178939]
+script = ExtResource("8_0v1st")
+metadata/_custom_type_script = "uid://ce70j5d0prvsl"
