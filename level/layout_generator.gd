@@ -10,10 +10,12 @@ extends Node3D
 @export var spoke_floor_item_id: int = 14
 @export var door_floor_item_id: int = 14
 @export var elevator_floor_item_id: int = 15
+@export var slope_floor_item_id: int = 33
 
 @export_group("Sector Sizes")
 @export var hub_size: Vector2i = Vector2i(24, 24)
 @export var spoke_depth: int = 8
+@export var min_spokes: int = 2
 @export var fill_density: float = 0.5
 
 @export_group("Tree Walker Tuning")
@@ -30,21 +32,22 @@ var placed_doors: Array[DoorData] = []
 var placed_keys: Array[KeyData] = []
 var dead_ends_by_region: Dictionary = {}
 var hub_bounds: Rect2i
-var spoke_bounds: Dictionary = {}
+var spoke_slots: Array[Dictionary] = []
 var elevator_pos: Vector2i
+var slope_placed: bool = false
 
 class Step:
-	var pos: Vector2i; var dir: Vector2i; var width: int; var region_id: int; var cells: Array[Vector2i]
-	func _init(p: Vector2i, d: Vector2i, w: int, r: int, cl: Array[Vector2i]) -> void:
-		pos = p; dir = d; width = w; region_id = r; cells = cl
+	var pos: Vector2i; var dir: Vector2i; var width: int; var region_id: int; var level_y: int; var cells: Array[Vector2i]
+	func _init(p: Vector2i, d: Vector2i, w: int, r: int, cl: Array[Vector2i], y: int = 0) -> void:
+		pos = p; dir = d; width = w; region_id = r; cells = cl; level_y = y
 
 class DoorData:
-	var pos: Vector2i; var key_index: int
-	func _init(p: Vector2i, idx: int) -> void: pos = p; key_index = idx
+	var pos: Vector3i; var key_index: int
+	func _init(p: Vector3i, idx: int) -> void: pos = p; key_index = idx
 
 class KeyData:
-	var pos: Vector2i; var key_index: int
-	func _init(p: Vector2i, idx: int) -> void: pos = p; key_index = idx
+	var pos: Vector3i; var key_index: int
+	func _init(p: Vector3i, idx: int) -> void: pos = p; key_index = idx
 
 
 func _ready() -> void:
@@ -62,287 +65,298 @@ func _ready() -> void:
 
 
 func _calculate_cross_bounds() -> void:
-	var hub_origin: Vector2i = Vector2i(spoke_depth + 1, spoke_depth + 1)
+	var hub_origin = Vector2i(spoke_depth + 1, spoke_depth + 1)
 	hub_bounds = Rect2i(hub_origin, hub_size)
+	spoke_slots.clear()
+	var half_w = hub_size.x / 2; var half_h = hub_size.y / 2
 
-	spoke_bounds[Vector2i.UP]    = Rect2i(Vector2i(hub_origin.x, hub_origin.y - 1 - spoke_depth), Vector2i(hub_size.x, spoke_depth))
-	spoke_bounds[Vector2i.DOWN]  = Rect2i(Vector2i(hub_origin.x, hub_bounds.end.y + 1), Vector2i(hub_size.x, spoke_depth))
-	spoke_bounds[Vector2i.LEFT]  = Rect2i(Vector2i(hub_origin.x - 1 - spoke_depth, hub_origin.y), Vector2i(spoke_depth, hub_size.y))
-	spoke_bounds[Vector2i.RIGHT] = Rect2i(Vector2i(hub_bounds.end.x + 1, hub_origin.y), Vector2i(spoke_depth, hub_size.y))
+	for dir in [Vector2i.UP, Vector2i.DOWN]:
+		var y = hub_origin.y - 1 - spoke_depth if dir == Vector2i.UP else hub_bounds.end.y + 1
+		for i in 2:
+			var x0 = hub_origin.x + i * half_w
+			var x1 = x0 + half_w if i == 0 else hub_bounds.end.x
+			spoke_slots.append({"dir": dir, "bounds": Rect2i(Vector2i(x0, y), Vector2i(half_w, spoke_depth)), "seam_range": [x0, x1]})
+
+	for dir in [Vector2i.LEFT, Vector2i.RIGHT]:
+		var x = hub_origin.x - 1 - spoke_depth if dir == Vector2i.LEFT else hub_bounds.end.x + 1
+		for i in 2:
+			var y0 = hub_origin.y + i * half_h
+			var y1 = y0 + half_h if i == 0 else hub_bounds.end.y
+			spoke_slots.append({"dir": dir, "bounds": Rect2i(Vector2i(x, y0), Vector2i(spoke_depth, half_h)), "seam_range": [y0, y1]})
 
 
 func generate_tree_walker_layout() -> void:
 	if not floor_gridmap: return
 	_clear_state()
 
-	# 1. Place Elevator at Hub Center
 	elevator_pos = hub_bounds.get_center()
-	_set_floor_tile(elevator_pos, 0, elevator_floor_item_id)
+	_set_floor_tile(elevator_pos, 0, 0, elevator_floor_item_id)
 
-	# 2. Build Hub Sector starting 1 tile North (Vector2i.UP) of Elevator
-	var hub_start: Vector2i = elevator_pos + Vector2i.UP
-	var hub_target: int = int(hub_bounds.size.x * hub_bounds.size.y * fill_density)
-	_generate_sector(hub_bounds, 0, hub_floor_item_id, hub_target, hub_start, Vector2i.UP, [elevator_pos])
+	# Hub spans 2 levels (Level 0 and Level -1), so density target accounts for both floors
+	var hub_target = int(hub_bounds.size.x * hub_bounds.size.y * fill_density * 2.0)
+	_generate_sector(hub_bounds, 0, hub_floor_item_id, hub_target, elevator_pos + Vector2i.UP, Vector2i.UP, 0, [elevator_pos], true)
 
-	# 3. Generate Spoke Sectors & Connect Doors
-	var region_id: int = 1
-	for dir in CARDINAL_DIRS:
-		var spoke_rect: Rect2i = spoke_bounds[dir]
-		var spoke_target: int = int(spoke_rect.size.x * spoke_rect.size.y * fill_density)
-		var spoke_start: Vector2i = _get_spoke_start_pos(dir)
+	var active_slots = spoke_slots.filter(func(_s): return randf() < 0.5)
+	if active_slots.size() < min_spokes:
+		var inactive = spoke_slots.filter(func(s): return not active_slots.has(s))
+		inactive.shuffle()
+		while active_slots.size() < min_spokes and not inactive.is_empty():
+			active_slots.append(inactive.pop_back())
 
-		# Generate Spoke
-		_generate_sector(spoke_rect, region_id, spoke_floor_item_id, spoke_target, spoke_start, dir)
+	var region_id = 1
+	for slot in active_slots:
+		var dir: Vector2i = slot["dir"]
+		var rect: Rect2i = slot["bounds"]
+		var target = int(rect.size.x * rect.size.y * fill_density)
+		var door_3d = _connect_spoke_door(slot, region_id)
+		var door_2d = Vector2i(door_3d.x, door_3d.z)
 
-		# Find natural door connection or fallback
-		_connect_spoke_door(dir, region_id)
+		_generate_sector(rect, region_id, spoke_floor_item_id, target, door_2d + dir, dir, door_3d.y, [door_2d])
 		region_id += 1
 
-	_assign_keys()
+	_assign_keys(active_slots.size())
 
 
-func _get_spoke_start_pos(dir: Vector2i) -> Vector2i:
-	if dir == Vector2i.UP:    return Vector2i(hub_bounds.position.x + hub_size.x / 2, hub_bounds.position.y - 2)
-	if dir == Vector2i.DOWN:  return Vector2i(hub_bounds.position.x + hub_size.x / 2, hub_bounds.end.y + 1)
-	if dir == Vector2i.LEFT:  return Vector2i(hub_bounds.position.x - 2, hub_bounds.position.y + hub_size.y / 2)
-	return Vector2i(hub_bounds.end.x + 1, hub_bounds.position.y + hub_size.y / 2)
-
-
-func _connect_spoke_door(dir: Vector2i, region_id: int) -> void:
-	var seam_positions: Array[Vector2i] = _get_seam_positions(dir)
-	var valid_candidates: Array[Vector2i] = []
-
-	# Check for natural adjacent tile connections across the seam
-	for door_pos in seam_positions:
-		var hub_tile: Vector2i = door_pos - dir
-		var spoke_tile: Vector2i = door_pos + dir
-		if committed_cells.get(hub_tile, -1) == 0 and committed_cells.get(spoke_tile, -1) == region_id:
-			valid_candidates.append(door_pos)
-
-	var chosen_door_pos: Vector2i
-
-	if not valid_candidates.is_empty():
-		# Use a natural connection point
-		chosen_door_pos = valid_candidates.pick_random()
-	else:
-		# Rare fallback: force a connection near center of seam
-		chosen_door_pos = seam_positions[seam_positions.size() / 2]
-		var hub_side: Vector2i = chosen_door_pos - dir
-		var spoke_side: Vector2i = chosen_door_pos + dir
-
-		_carve_path(_find_closest_cell_in_region(hub_side, 0), hub_side, 0, hub_floor_item_id)
-		_carve_path(_find_closest_cell_in_region(spoke_side, region_id), spoke_side, region_id, spoke_floor_item_id)
-
-	_set_floor_tile(chosen_door_pos, region_id, door_floor_item_id)
-	placed_doors.append(DoorData.new(chosen_door_pos, region_id))
-
-
-func _get_seam_positions(dir: Vector2i) -> Array[Vector2i]:
-	var positions: Array[Vector2i] = []
-	if dir == Vector2i.UP or dir == Vector2i.DOWN:
-		var door_y: int = hub_bounds.position.y - 1 if dir == Vector2i.UP else hub_bounds.end.y
-		for x in range(hub_bounds.position.x, hub_bounds.end.x):
-			positions.append(Vector2i(x, door_y))
-	else:
-		var door_x: int = hub_bounds.position.x - 1 if dir == Vector2i.LEFT else hub_bounds.end.x
-		for y in range(hub_bounds.position.y, hub_bounds.end.y):
-			positions.append(Vector2i(door_x, y))
-	return positions
-
-
-func _find_closest_cell_in_region(target_pos: Vector2i, region_id: int) -> Vector2i:
-	var best_cell: Vector2i = target_pos
-	var min_dist: float = INF
-	for cell: Vector2i in committed_cells:
-		if committed_cells[cell] == region_id:
-			var dist: float = cell.distance_squared_to(target_pos)
-			if dist < min_dist:
-				min_dist = dist
-				best_cell = cell
-	return best_cell
-
-
-func _carve_path(from_cell: Vector2i, to_cell: Vector2i, region_id: int, floor_id: int) -> void:
-	var curr: Vector2i = from_cell
-	_set_floor_tile(curr, region_id, floor_id)
-	while curr != to_cell:
-		if curr.x != to_cell.x:
-			curr.x += 1 if to_cell.x > curr.x else -1
-		elif curr.y != to_cell.y:
-			curr.y += 1 if to_cell.y > curr.y else -1
-		_set_floor_tile(curr, region_id, floor_id)
-
-
-func _generate_sector(bounds: Rect2i, region_id: int, floor_id: int, target_tiles: int, start_pos: Vector2i, start_dir: Vector2i, origin_override: Array[Vector2i] = []) -> void:
+func _generate_sector(bounds: Rect2i, region_id: int, floor_id: int, target_tiles: int, start_pos: Vector2i, start_dir: Vector2i, level_y: int, origin_cells: Array[Vector2i] = [], is_hub: bool = false) -> void:
 	trail.clear()
 	dead_ends_by_region.get_or_add(region_id, [])
 
-	var start_cells: Array[Vector2i] = _get_step_cells(start_pos, start_dir, 1)
-	if not _is_step_valid(start_cells, origin_override, bounds): return
-	_push_step(Step.new(start_pos, start_dir, 1, region_id, start_cells), floor_id)
+	var start_cells = _get_step_cells(start_pos, start_dir, 1)
+	if not _is_step_valid(start_cells, origin_cells, bounds, level_y): return
+	_push_step(Step.new(start_pos, start_dir, 1, region_id, start_cells, level_y), floor_id)
 
-	var initial_count: int = committed_cells.size()
-	var iterations: int = 0
+	var initial_count = committed_cells.size()
+	var iterations = 0
 
 	while (committed_cells.size() - initial_count) < target_tiles and iterations < 25000:
 		iterations += 1
 
+		if is_hub and not slope_placed and (committed_cells.size() - initial_count) >= (target_tiles * 0.4):
+			if _try_place_hub_slope(bounds, level_y):
+				slope_placed = true
+				level_y = -1
+				continue
+
 		if trail.is_empty() or (trail.size() > 1 and randf() < deadend_chance):
-			_mark_current_dead_end()
-			trail.clear()
-			if not _start_new_branch(region_id, bounds, floor_id): break
+			if not _reset_and_branch(region_id, bounds, floor_id, level_y): break
 			continue
 
-		var current: Step = trail.back()
-		var next_dir: Vector2i = current.dir
-		var next_width: int = current.width
+		var current = trail.back()
+		var next_dir = _get_perp_dirs(current.dir).pick_random() if randf() < dir_change_chance else current.dir
+		var next_pos = current.pos + next_dir
+		var target_cells = _get_step_cells(next_pos, next_dir, current.width)
 
-		var roll: float = randf()
-		if roll < dir_change_chance:
-			next_dir = _get_perp_dirs(current.dir).pick_random()
-
-		var next_pos: Vector2i = current.pos + next_dir
-		var target_cells: Array[Vector2i] = _get_step_cells(next_pos, next_dir, next_width)
-
-		if _is_step_valid(target_cells, current.cells, bounds):
-			_push_step(Step.new(next_pos, next_dir, next_width, region_id, target_cells), floor_id)
+		if _is_step_valid(target_cells, current.cells, bounds, level_y):
+			_push_step(Step.new(next_pos, next_dir, current.width, region_id, target_cells, level_y), floor_id)
 			continue
 
-		if _try_perpendicular_turn_at_step(current, bounds, floor_id): continue
+		if _try_perpendicular_turn_at_step(current, bounds, floor_id, level_y): continue
 
-		var branched: bool = false
-		var backtracked: int = 0
-		while trail.size() > 1 and backtracked < backtrack_depth:
+		var branched = false
+		for _i in range(min(backtrack_depth, trail.size() - 1)):
 			trail.pop_back()
-			backtracked += 1
-			if _try_perpendicular_turn_at_step(trail.back(), bounds, floor_id):
+			if _try_perpendicular_turn_at_step(trail.back(), bounds, floor_id, level_y):
 				branched = true
 				break
 
-		if not branched:
-			_mark_current_dead_end()
-			trail.clear()
-			if not _start_new_branch(region_id, bounds, floor_id): break
+		if not branched and not _reset_and_branch(region_id, bounds, floor_id, level_y): break
 
 	_mark_current_dead_end()
 
 
-func _is_step_valid(target_cells: Array[Vector2i], origin_cells: Array[Vector2i], bounds: Rect2i) -> bool:
+func _reset_and_branch(region_id: int, bounds: Rect2i, floor_id: int, level_y: int) -> bool:
+	_mark_current_dead_end()
+	trail.clear()
+	return _start_new_branch(region_id, bounds, floor_id, level_y)
+
+
+func _try_place_hub_slope(bounds: Rect2i, level_y: int) -> bool:
+	if trail.is_empty(): return false
+	var top_pos = trail.back().pos + trail.back().dir
+	var bot_pos = top_pos + trail.back().dir
+
+	if not bounds.has_point(top_pos) or not bounds.has_point(bot_pos): return false
+	if committed_cells.has(Vector3i(top_pos.x, 0, top_pos.y)) or committed_cells.has(Vector3i(bot_pos.x, -1, bot_pos.y)): return false
+
+	_set_floor_tile(top_pos, 0, 0, slope_floor_item_id, _get_slope_orientation(trail.back().dir))
+	committed_cells[Vector3i(bot_pos.x, -1, bot_pos.y)] = 0
+	_push_step(Step.new(bot_pos, trail.back().dir, 1, 0, [bot_pos], -1), hub_floor_item_id)
+	return true
+
+
+func _connect_spoke_door(slot: Dictionary, region_id: int) -> Vector3i:
+	var dir: Vector2i = slot["dir"]
+	var valid_candidates: Array[Vector3i] = []
+
+	for p in _get_seam_positions(slot):
+		for y in [0, -1]:
+			if committed_cells.get(Vector3i(p.x - dir.x, y, p.y - dir.y), -1) == 0:
+				valid_candidates.append(Vector3i(p.x, y, p.y))
+
+	var fallback_pos = slot["seam_range"][0] + (slot["seam_range"][1] - slot["seam_range"][0]) / 2
+	var chosen = valid_candidates.pick_random() if not valid_candidates.is_empty() else Vector3i(fallback_pos, 0, fallback_pos)
+
+	if valid_candidates.is_empty():
+		var hub_side = Vector2i(chosen.x, chosen.z) - dir
+		_carve_path(_find_closest_cell_in_region(hub_side, 0, 0), hub_side, 0, hub_floor_item_id, 0)
+
+	_set_floor_tile(Vector2i(chosen.x, chosen.z), chosen.y, region_id, door_floor_item_id)
+	placed_doors.append(DoorData.new(chosen, region_id))
+	return chosen
+
+
+func _get_seam_positions(slot: Dictionary) -> Array[Vector2i]:
+	var dir: Vector2i = slot["dir"]
+	var is_vert = (dir.y != 0)
+	var fixed_c = (hub_bounds.position.y - 1 if dir == Vector2i.UP else hub_bounds.end.y) if is_vert else (hub_bounds.position.x - 1 if dir == Vector2i.LEFT else hub_bounds.end.x)
+	var res: Array[Vector2i] = []
+	for i in range(slot["seam_range"][0], slot["seam_range"][1]):
+		res.append(Vector2i(i, fixed_c) if is_vert else Vector2i(fixed_c, i))
+	return res
+
+
+func _is_step_valid(target_cells: Array[Vector2i], origin_cells: Array[Vector2i], bounds: Rect2i, level_y: int) -> bool:
 	for cell in target_cells:
-		if not bounds.has_point(cell) or committed_cells.has(cell):
+		if not bounds.has_point(cell) or committed_cells.has(Vector3i(cell.x, level_y, cell.y)):
 			return false
 
 	var allowed: Dictionary = {}
-	var origin_neighbors: Dictionary = {}
-
 	for c in origin_cells: allowed[c] = true
-	var recent_count: int = min(2, trail.size())
-	for i in range(trail.size() - recent_count, trail.size()):
-		for c in trail[i].cells: allowed[c] = true
+	for step in trail.slice(-min(2, trail.size())):
+		for c in step.cells: allowed[c] = true
 
-	for allowed_cell in allowed.keys():
+	var origin_neighbors: Dictionary = {}
+	for ac in allowed:
 		for dx in range(-1, 2):
 			for dy in range(-1, 2):
-				origin_neighbors[allowed_cell + Vector2i(dx, dy)] = true
+				origin_neighbors[ac + Vector2i(dx, dy)] = true
 
 	for c in target_cells: allowed[c] = true
 
 	for cell in target_cells:
 		for dx in range(-1, 2):
 			for dy in range(-1, 2):
-				var neighbor: Vector2i = cell + Vector2i(dx, dy)
-				if not allowed.has(neighbor) and not origin_neighbors.has(neighbor) and committed_cells.has(neighbor):
+				var n = cell + Vector2i(dx, dy)
+				if not allowed.has(n) and not origin_neighbors.has(n) and committed_cells.has(Vector3i(n.x, level_y, n.y)):
 					return false
 	return true
 
 
-func _try_perpendicular_turn_at_step(step: Step, bounds: Rect2i, floor_id: int) -> bool:
-	var perp_dirs: Array[Vector2i] = _get_perp_dirs(step.dir)
+func _try_perpendicular_turn_at_step(step: Step, bounds: Rect2i, floor_id: int, level_y: int) -> bool:
+	var perp_dirs = _get_perp_dirs(step.dir)
 	perp_dirs.shuffle()
 	var widths: Array = [step.width, 1] if step.width > 1 else [1]
 
 	for p_dir in perp_dirs:
 		for w in widths:
-			var test_pos: Vector2i = step.pos + p_dir
-			var test_cells: Array[Vector2i] = _get_step_cells(test_pos, p_dir, w)
-			if _is_step_valid(test_cells, step.cells, bounds):
-				_push_step(Step.new(test_pos, p_dir, w, step.region_id, test_cells), floor_id)
+			var test_pos = step.pos + p_dir
+			var test_cells = _get_step_cells(test_pos, p_dir, w)
+			if _is_step_valid(test_cells, step.cells, bounds, level_y):
+				_push_step(Step.new(test_pos, p_dir, w, step.region_id, test_cells, level_y), floor_id)
 				return true
 	return false
 
 
-func _start_new_branch(region_id: int, bounds: Rect2i, floor_id: int) -> bool:
-	var region_cells: Array = committed_cells.keys().filter(
-		func(c): return committed_cells[c] == region_id and c != elevator_pos
-	)
+func _start_new_branch(region_id: int, bounds: Rect2i, floor_id: int, level_y: int) -> bool:
+	var region_cells: Array[Vector2i] = []
+	for c: Vector3i in committed_cells:
+		if committed_cells[c] == region_id and c.y == level_y and Vector2i(c.x, c.z) != elevator_pos:
+			region_cells.append(Vector2i(c.x, c.z))
+
 	if region_cells.is_empty(): return false
 
 	region_cells.shuffle()
 	for i in range(min(200, region_cells.size())):
-		var cell: Vector2i = region_cells[i]
-		var dirs: Array[Vector2i] = CARDINAL_DIRS.duplicate()
+		var cell = region_cells[i]
+		var dirs = CARDINAL_DIRS.duplicate()
 		dirs.shuffle()
 
 		for d in dirs:
-			var test_pos: Vector2i = cell + d
-			var test_cells: Array[Vector2i] = _get_step_cells(test_pos, d, 1)
-			if _is_step_valid(test_cells, [cell], bounds):
-				_push_step(Step.new(test_pos, d, 1, region_id, test_cells), floor_id)
+			var test_pos = cell + d
+			var test_cells = _get_step_cells(test_pos, d, 1)
+			if _is_step_valid(test_cells, [cell], bounds, level_y):
+				_push_step(Step.new(test_pos, d, 1, region_id, test_cells, level_y), floor_id)
 				return true
 	return false
 
 
-func _assign_keys() -> void:
-	placed_keys.clear()
+func _find_closest_cell_in_region(target_pos: Vector2i, region_id: int, level_y: int) -> Vector2i:
+	var best_cell = target_pos
+	var min_dist = INF
+	for c: Vector3i in committed_cells:
+		if committed_cells[c] == region_id and c.y == level_y:
+			var cell_2d = Vector2i(c.x, c.z)
+			var dist = cell_2d.distance_squared_to(target_pos)
+			if dist < min_dist:
+				min_dist = dist
+				best_cell = cell_2d
+	return best_cell
 
-	var spoke_order: Array[int] = [1, 2, 3, 4]
+
+func _carve_path(from_cell: Vector2i, to_cell: Vector2i, region_id: int, floor_id: int, level_y: int) -> void:
+	var curr = from_cell
+	_set_floor_tile(curr, level_y, region_id, floor_id)
+	while curr != to_cell:
+		if curr.x != to_cell.x:
+			curr.x += 1 if to_cell.x > curr.x else -1
+		elif curr.y != to_cell.y:
+			curr.y += 1 if to_cell.y > curr.y else -1
+		_set_floor_tile(curr, level_y, region_id, floor_id)
+
+
+func _assign_keys(active_spoke_count: int) -> void:
+	placed_keys.clear()
+	var spoke_order = range(1, active_spoke_count + 1)
 	spoke_order.shuffle()
 
-	var sector_chain: Array[int] = [0]
-	sector_chain.append_array(spoke_order)
-
+	var sector_chain = [0] + spoke_order
 	for i in range(sector_chain.size() - 1):
 		var source_sector: int = sector_chain[i]
 		var target_spoke: int = sector_chain[i + 1]
 
 		var dead_ends: Array = dead_ends_by_region.get(source_sector, [])
 		if not dead_ends.is_empty():
-			var key_pos: Vector2i = dead_ends.pick_random()
-			dead_ends.erase(key_pos)
-			placed_keys.append(KeyData.new(key_pos, target_spoke))
+			var key_pos_3d: Vector3i = dead_ends.pick_random()
+			dead_ends.erase(key_pos_3d)
+			placed_keys.append(KeyData.new(key_pos_3d, target_spoke))
 
 
 func _mark_current_dead_end() -> void:
 	if not trail.is_empty():
-		var last_step: Step = trail.back()
+		var last_step = trail.back()
 		var list: Array = dead_ends_by_region.get_or_add(last_step.region_id, [])
-		if not list.has(last_step.pos):
-			list.append(last_step.pos)
+		var pos_3d = Vector3i(last_step.pos.x, last_step.level_y, last_step.pos.y)
+		if not list.has(pos_3d): list.append(pos_3d)
 
 
 func _push_step(step: Step, floor_id: int) -> void:
 	trail.append(step)
 	for cell in step.cells:
-		_set_floor_tile(cell, step.region_id, floor_id)
+		_set_floor_tile(cell, step.level_y, step.region_id, floor_id)
 
 
-func _set_floor_tile(cell: Vector2i, region_id: int, floor_id: int) -> void:
-	committed_cells[cell] = region_id
-	floor_gridmap.set_cell_item(Vector3i(cell.x, 0, cell.y), floor_id)
+func _set_floor_tile(cell: Vector2i, level_y: int, region_id: int, floor_id: int, orientation: int = 0) -> void:
+	var cell_3d = Vector3i(cell.x, level_y, cell.y)
+	committed_cells[cell_3d] = region_id
+	floor_gridmap.set_cell_item(cell_3d, floor_id, orientation)
 
 
-func _get_step_cells(center_pos: Vector2i, dir: Vector2i, width: int) -> Array[Vector2i]:
+func _get_step_cells(center: Vector2i, dir: Vector2i, width: int) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
-	var perp: Vector2i = Vector2i(-dir.y, dir.x)
-	var start_offset: int = -(width - 1) / 2
-	for i in range(width):
-		cells.append(center_pos + perp * (start_offset + i))
+	var perp = Vector2i(-dir.y, dir.x)
+	for i in width:
+		cells.append(center + perp * (i - (width - 1) / 2))
 	return cells
 
 
 func _get_perp_dirs(dir: Vector2i) -> Array[Vector2i]:
-	var perp: Vector2i = Vector2i(-dir.y, dir.x)
+	var perp = Vector2i(-dir.y, dir.x)
 	return [perp, -perp]
+
+
+func _get_slope_orientation(dir: Vector2i) -> int:
+	# Rotated 90 degrees clockwise
+	return 16 if dir == Vector2i.UP else 10 if dir == Vector2i.RIGHT else 22 if dir == Vector2i.DOWN else 0
 
 
 func _clear_state() -> void:
@@ -352,4 +366,5 @@ func _clear_state() -> void:
 	placed_doors.clear()
 	placed_keys.clear()
 	trail.clear()
+	slope_placed = false
 	elevator_pos = Vector2i.MIN

@@ -7,7 +7,7 @@ extends Node3D
 @export var WALL_ITEM_ID: int = 51
 @export var CORNER_ITEM_ID: int = 11
 @export var INNER_CORNER_ITEM_ID: int = 11 # Set to a separate ID if inner corners require a flipped mesh
-@export var CROSS_ITEM_ID: int = 33         # Cross/X wall tile for diagonal intersections
+@export var CROSS_ITEM_ID: int = 31         # Cross/X wall tile for diagonal intersections
 
 @export_group("Rotations")
 @export_enum("0:0", "90:90", "180:180", "270:270") var straight_horizontal: int = 90
