@@ -1,13 +1,17 @@
 class_name WallGenerator
 extends Node3D
 
+@export_group("GridMaps")
 @export var floor_gridmap: GridMap
 @export var wall_gridmap: GridMap
+@export var roof_gridmap: GridMap ## Optional: Target for roofs. If empty, pastes roofs directly into floor_gridmap.
 
+@export_group("Tiles")
 @export var WALL_ITEM_ID: int = 51
 @export var CORNER_ITEM_ID: int = 11
 @export var INNER_CORNER_ITEM_ID: int = 11 # Set to a separate ID if inner corners require a flipped mesh
 @export var CROSS_ITEM_ID: int = 31         # Cross/X wall tile for diagonal intersections
+@export var slope_item_ids: Array[int] = [] ## Add slope/ramp Tile IDs here. Walls will leave openings for them.
 
 @export_group("Rotations")
 @export_enum("0:0", "90:90", "180:180", "270:270") var straight_horizontal: int = 90
@@ -23,19 +27,29 @@ extends Node3D
 
 var floor_cells: Dictionary = {}
 
+
 func run() -> void:
-	if wall_gridmap and floor_gridmap:
+	if floor_gridmap:
 		var cell_size := floor_gridmap.cell_size
-		wall_gridmap.position = floor_gridmap.position - Vector3(cell_size.x * 0.5, 0, cell_size.z * 0.5)
+		if wall_gridmap:
+			wall_gridmap.position = floor_gridmap.position - Vector3(cell_size.x * 0.5, 0, cell_size.z * 0.5)
+		if roof_gridmap:
+			roof_gridmap.position = floor_gridmap.position # Roofs share exact cell alignment with floors
 
 	create_floors()
 	create_walls()
+	create_roofs()
+
 
 func create_floors() -> void:
 	floor_cells.clear()
 	if floor_gridmap:
 		for cell in floor_gridmap.get_used_cells():
-			floor_cells[Vector2i(cell.x, cell.z)] = true
+			floor_cells[cell] = {
+				"item": floor_gridmap.get_cell_item(cell),
+				"orientation": floor_gridmap.get_cell_item_orientation(cell)
+			}
+
 
 func create_walls() -> void:
 	if not wall_gridmap or floor_cells.is_empty():
@@ -43,27 +57,77 @@ func create_walls() -> void:
 		
 	wall_gridmap.clear()
 
-	var min_pos := Vector2i(999999, 999999)
-	var max_pos := Vector2i(-999999, -999999)
+	# Collect Y-levels and their respective 2D X/Z bounds
+	var levels: Dictionary = {}
 
-	for cell in floor_cells.keys():
-		min_pos.x = mini(min_pos.x, cell.x)
-		min_pos.y = mini(min_pos.y, cell.y)
-		max_pos.x = maxi(max_pos.x, cell.x)
-		max_pos.y = maxi(max_pos.y, cell.y)
+	for cell: Vector3i in floor_cells.keys():
+		var y := cell.y
+		if not levels.has(y):
+			levels[y] = {
+				"min": Vector2i(cell.x, cell.z),
+				"max": Vector2i(cell.x, cell.z)
+			}
+		else:
+			var bounds: Dictionary = levels[y]
+			bounds["min"].x = mini(bounds["min"].x, cell.x)
+			bounds["min"].y = mini(bounds["min"].y, cell.z)
+			bounds["max"].x = maxi(bounds["max"].x, cell.x)
+			bounds["max"].y = maxi(bounds["max"].y, cell.z)
 
-	for wx in range(min_pos.x, max_pos.x + 2):
-		for wz in range(min_pos.y, max_pos.y + 2):
-			_place_wall_tile_at_corner(wx, wz)
+	# Generate walls for each floor level independently
+	for wy in levels.keys():
+		var bounds: Dictionary = levels[wy]
+		var min_pos: Vector2i = bounds["min"]
+		var max_pos: Vector2i = bounds["max"]
 
-func _has_floor(x: int, z: int) -> bool:
-	return floor_cells.has(Vector2i(x, z))
+		for wx in range(min_pos.x, max_pos.x + 2):
+			for wz in range(min_pos.y, max_pos.y + 2):
+				_place_wall_tile_at_corner(wx, wy, wz)
 
-func _place_wall_tile_at_corner(wx: int, wz: int) -> void:
-	var q_tl := 1 if _has_floor(wx - 1, wz - 1) else 0
-	var q_tr := 2 if _has_floor(wx,     wz - 1) else 0
-	var q_br := 4 if _has_floor(wx,     wz)     else 0
-	var q_bl := 8 if _has_floor(wx - 1, wz)     else 0
+
+func create_roofs() -> void:
+	if floor_cells.is_empty():
+		return
+		
+	var target_map: GridMap = roof_gridmap if roof_gridmap else floor_gridmap
+	if not target_map:
+		return
+		
+	if roof_gridmap:
+		roof_gridmap.clear()
+		
+	for cell: Vector3i in floor_cells.keys():
+		var roof_pos := cell + Vector3i(0, 1, 0)
+		
+		# Can't overwrite existing floors
+		if not floor_cells.has(roof_pos):
+			var data: Dictionary = floor_cells[cell]
+			target_map.set_cell_item(roof_pos, data["item"], data["orientation"])
+
+
+func _has_floor(x: int, y: int, z: int) -> bool:
+	var pos := Vector3i(x, y, z)
+	if floor_cells.has(pos):
+		return true
+		
+	# Slope accommodation: if the cell directly above or below is a slope, 
+	# treat this level as continuous so we don't spawn a blocking wall across the ramp.
+	var below := Vector3i(x, y - 1, z)
+	if floor_cells.has(below) and floor_cells[below]["item"] in slope_item_ids:
+		return true
+		
+	var above := Vector3i(x, y + 1, z)
+	if floor_cells.has(above) and floor_cells[above]["item"] in slope_item_ids:
+		return true
+
+	return false
+
+
+func _place_wall_tile_at_corner(wx: int, wy: int, wz: int) -> void:
+	var q_tl := 1 if _has_floor(wx - 1, wy, wz - 1) else 0
+	var q_tr := 2 if _has_floor(wx,     wy, wz - 1) else 0
+	var q_br := 4 if _has_floor(wx,     wy, wz)     else 0
+	var q_bl := 8 if _has_floor(wx - 1, wy, wz)     else 0
 
 	var bitmask := q_tl | q_tr | q_br | q_bl
 	var item_id := -1
@@ -119,7 +183,8 @@ func _place_wall_tile_at_corner(wx: int, wz: int) -> void:
 
 	if item_id != -1:
 		var orientation := _get_ortho_index(angle_deg)
-		wall_gridmap.set_cell_item(Vector3i(wx, 0, wz), item_id, orientation)
+		wall_gridmap.set_cell_item(Vector3i(wx, wy, wz), item_id, orientation)
+
 
 func _get_ortho_index(deg: int) -> int:
 	var basis := Basis.from_euler(Vector3(0, deg_to_rad(deg), 0))
