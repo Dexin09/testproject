@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://y2cll8nvcy88"
-path.s3tc="res://.godot/imported/plastic_white.png-ee2db41998862a579f880bee96025af5.s3tc.ctex"
+uid="uid://br7cncns5meax"
+path.s3tc="res://.godot/imported/concrete_cracked.png-e1a24ecb5a8f796352dab770e5985fb9.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/plastic_white.png"
-dest_files=["res://.godot/imported/plastic_white.png-ee2db41998862a579f880bee96025af5.s3tc.ctex"]
+source_file="res://level/textures/source/concrete_cracked.png"
+dest_files=["res://.godot/imported/concrete_cracked.png-e1a24ecb5a8f796352dab770e5985fb9.s3tc.ctex"]
 
 [params]
 

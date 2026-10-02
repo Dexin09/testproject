@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c7y2xqbgcvuky"
-path.s3tc="res://.godot/imported/metal_tarnished.png-4728929e0c0bcee4bfd5fa3195a9c317.s3tc.ctex"
+uid="uid://yh5uixtilbnc"
+path.s3tc="res://.godot/imported/plastic_red.png-0a00aca1efc488f2652a7aa97788fb97.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/metal_tarnished.png"
-dest_files=["res://.godot/imported/metal_tarnished.png-4728929e0c0bcee4bfd5fa3195a9c317.s3tc.ctex"]
+source_file="res://level/textures/source/plastic_red.png"
+dest_files=["res://.godot/imported/plastic_red.png-0a00aca1efc488f2652a7aa97788fb97.s3tc.ctex"]
 
 [params]
 

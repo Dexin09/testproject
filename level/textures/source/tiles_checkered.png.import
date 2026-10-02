@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bcecb46vn00ep"
-path.s3tc="res://.godot/imported/wood_light.png-54860e789fe09fd6e186157c43f8640f.s3tc.ctex"
+uid="uid://dnvqrmgwd4pu0"
+path.s3tc="res://.godot/imported/tiles_checkered.png-00856c8adad2200c058b3896537b6cde.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/wood_light.png"
-dest_files=["res://.godot/imported/wood_light.png-54860e789fe09fd6e186157c43f8640f.s3tc.ctex"]
+source_file="res://level/textures/source/tiles_checkered.png"
+dest_files=["res://.godot/imported/tiles_checkered.png-00856c8adad2200c058b3896537b6cde.s3tc.ctex"]
 
 [params]
 

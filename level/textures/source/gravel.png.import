@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://3xkpqblkgvpx"
-path.s3tc="res://.godot/imported/corrugated_wide.png-25134a28880d5fb0dc3d6b0a824e84a2.s3tc.ctex"
+uid="uid://dpwwhmace81ld"
+path.s3tc="res://.godot/imported/gravel.png-383f6b3189059f0b0c0c2abc967661d1.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/corrugated_wide.png"
-dest_files=["res://.godot/imported/corrugated_wide.png-25134a28880d5fb0dc3d6b0a824e84a2.s3tc.ctex"]
+source_file="res://level/textures/source/gravel.png"
+dest_files=["res://.godot/imported/gravel.png-383f6b3189059f0b0c0c2abc967661d1.s3tc.ctex"]
 
 [params]
 

@@ -2,21 +2,20 @@ class_name LayoutGenerator
 extends Node3D
 
 @export var floor_gridmap: GridMap
-@export var wall_generator: Node
+@export var wall_generator: WallGenerator
 @export var camera: Node
 
 @export_group("Floor Item Setup")
-@export var hub_floor_item_id: int = 11
-@export var spoke_floor_item_id: int = 14
-@export var door_floor_item_id: int = 14
-@export var elevator_floor_item_id: int = 15
-@export var slope_floor_item_id: int = 33
-@export var vent_floor_item_id: int = 15
+@export var hub_floor_item_id: int = 0
+@export var spoke_floor_item_id: int = 1
+@export var elevator_floor_item_id: int = 2
+@export var slope_floor_item_id: int = 3
+@export var vent_floor_item_id: int = 4
 
 @export_group("Sector Sizes")
 @export var hub_size: Vector2i = Vector2i(24, 24)
 @export var spoke_depth: int = 12
-@export var min_spokes: int = 2
+@export var min_spokes: int = 4
 @export_range(0.0, 1.0) var fill_density: float = 0.5
 @export_range(0.0, 1.0) var vent_density: float = 0.05
 
@@ -47,28 +46,20 @@ class Step:
 	var region_id: int
 	var level_y: int
 	var cells: Array[Vector2i]
-	
 	func _init(p: Vector2i, d: Vector2i, w: int, r: int, cl: Array[Vector2i], y: int = 0) -> void:
-		pos = p
-		dir = d
-		width = w
-		region_id = r
-		cells = cl
-		level_y = y
+		pos = p; dir = d; width = w; region_id = r; cells = cl; level_y = y
 
 class DoorData:
 	var pos: Vector3i
 	var key_index: int
 	func _init(p: Vector3i, idx: int) -> void:
-		pos = p
-		key_index = idx
+		pos = p; key_index = idx
 
 class KeyData:
 	var pos: Vector3i
 	var key_index: int
 	func _init(p: Vector3i, idx: int) -> void:
-		pos = p
-		key_index = idx
+		pos = p; key_index = idx
 
 
 func _ready() -> void:
@@ -94,7 +85,7 @@ func _calculate_cross_bounds() -> void:
 			var is_vert: bool = (dir.y != 0)
 			var pos: Vector2i
 			var size: Vector2i
-			var seam: Array
+			var seam: Array[int]
 
 			if is_vert:
 				var y: int = hub_origin.y - 1 - spoke_depth if dir == Vector2i.UP else hub_bounds.end.y + 1
@@ -205,7 +196,7 @@ func _try_place_vents(bounds: Rect2i, region_id: int, vent_count: int, level_y: 
 	var candidates: Array[Vector2i] = []
 	for x in range(bounds.position.x, bounds.end.x):
 		for y in range(bounds.position.y, bounds.end.y):
-			var pos := Vector2i(x, y)
+			var pos: Vector2i = Vector2i(x, y)
 			if not committed_cells.has(_to_3d(pos, level_y)):
 				candidates.append(pos)
 
@@ -213,56 +204,52 @@ func _try_place_vents(bounds: Rect2i, region_id: int, vent_count: int, level_y: 
 
 	var placed: int = 0
 	for pos in candidates:
-		if placed >= vent_count:
-			break
-		if _is_valid_vent_position(pos, region_id, level_y):
-			_set_floor_tile(pos, level_y, VENT_RESERVED_REGION, vent_floor_item_id)
+		if placed >= vent_count: break
+		var vent_rot: int = _get_vent_orientation(pos, region_id, level_y)
+		if vent_rot != -1:
+			_set_floor_tile(pos, level_y, VENT_RESERVED_REGION, vent_floor_item_id, vent_rot)
 			placed += 1
 
 
-func _is_valid_vent_position(pos: Vector2i, region_id: int, level_y: int) -> bool:
-	if committed_cells.has(_to_3d(pos, level_y)):
-		return false
+func _get_vent_orientation(pos: Vector2i, region_id: int, level_y: int) -> int:
+	if committed_cells.has(_to_3d(pos, level_y)): return -1
 
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
 			if (dx != 0 or dy != 0) and _is_special_tile(pos + Vector2i(dx, dy), level_y):
-				return false
+				return -1
 
-	var up_is_floor := _is_normal_floor_tile(pos + Vector2i.UP, level_y, region_id)
-	var down_is_floor := _is_normal_floor_tile(pos + Vector2i.DOWN, level_y, region_id)
-	var left_is_floor := _is_normal_floor_tile(pos + Vector2i.LEFT, level_y, region_id)
-	var right_is_floor := _is_normal_floor_tile(pos + Vector2i.RIGHT, level_y, region_id)
+	var u_fl: bool = _is_normal_floor_tile(pos + Vector2i.UP, level_y, region_id)
+	var d_fl: bool = _is_normal_floor_tile(pos + Vector2i.DOWN, level_y, region_id)
+	var l_fl: bool = _is_normal_floor_tile(pos + Vector2i.LEFT, level_y, region_id)
+	var r_fl: bool = _is_normal_floor_tile(pos + Vector2i.RIGHT, level_y, region_id)
 
-	var up_empty := not committed_cells.has(_to_3d(pos + Vector2i.UP, level_y))
-	var down_empty := not committed_cells.has(_to_3d(pos + Vector2i.DOWN, level_y))
-	var left_empty := not committed_cells.has(_to_3d(pos + Vector2i.LEFT, level_y))
-	var right_empty := not committed_cells.has(_to_3d(pos + Vector2i.RIGHT, level_y))
+	var u_emp: bool = not committed_cells.has(_to_3d(pos + Vector2i.UP, level_y))
+	var d_emp: bool = not committed_cells.has(_to_3d(pos + Vector2i.DOWN, level_y))
+	var l_emp: bool = not committed_cells.has(_to_3d(pos + Vector2i.LEFT, level_y))
+	var r_emp: bool = not committed_cells.has(_to_3d(pos + Vector2i.RIGHT, level_y))
 
-	var vert_bridge := up_is_floor and down_is_floor and left_empty and right_empty
-	var horiz_bridge := left_is_floor and right_is_floor and up_empty and down_empty
+	if u_fl and d_fl and l_emp and r_emp:
+		return _dir_to_orientation(Vector2i.RIGHT)
+	elif l_fl and r_fl and u_emp and d_emp:
+		return _dir_to_orientation(Vector2i.UP)
 
-	return vert_bridge or horiz_bridge
+	return -1
 
 
 func _is_special_tile(pos: Vector2i, level_y: int) -> bool:
-	var pos_3d := _to_3d(pos, level_y)
-	if level_y == 0 and pos == elevator_pos:
-		return true
+	var pos_3d: Vector3i = _to_3d(pos, level_y)
+	if level_y == 0 and pos == elevator_pos: return true
 	var region: int = committed_cells.get(pos_3d, -1)
-	if region == SLOPE_RESERVED_REGION or region == VENT_RESERVED_REGION:
-		return true
+	if region == SLOPE_RESERVED_REGION or region == VENT_RESERVED_REGION: return true
 	for door in placed_doors:
-		if door.pos == pos_3d:
-			return true
+		if door.pos == pos_3d: return true
 	return false
 
 
 func _is_normal_floor_tile(pos: Vector2i, level_y: int, region_id: int) -> bool:
-	var pos_3d := _to_3d(pos, level_y)
-	if not committed_cells.has(pos_3d) or committed_cells[pos_3d] != region_id:
-		return false
-	return not _is_special_tile(pos, level_y)
+	var pos_3d: Vector3i = _to_3d(pos, level_y)
+	return committed_cells.get(pos_3d, -1) == region_id and not _is_special_tile(pos, level_y)
 
 
 func _reset_and_branch(region_id: int, bounds: Rect2i, floor_id: int, level_y: int) -> bool:
@@ -278,20 +265,19 @@ func _try_place_hub_slope(bounds: Rect2i, level_y: int) -> bool:
 	var top_pos: Vector2i = entry_pos + dir
 	var bot_pos: Vector2i = top_pos + dir
 	var exit_pos: Vector2i = bot_pos + dir
-
-	var slope_corridor_2d: Array[Vector2i] = [top_pos, bot_pos]
+	var slope_corridor: Array[Vector2i] = [top_pos, bot_pos]
 
 	for p in [top_pos, bot_pos, exit_pos]:
 		if not bounds.has_point(p) or _is_too_close_to_seam(p, bounds):
 			return false
 
-	if not _is_slope_clear(slope_corridor_2d, level_y, entry_pos) or not _is_slope_clear(slope_corridor_2d, level_y - 1, exit_pos):
+	if not _is_slope_clear(slope_corridor, level_y, entry_pos) or not _is_slope_clear(slope_corridor, level_y - 1, exit_pos):
 		return false
 
-	var slope_rot: int = _get_slope_orientation(dir)
+	var slope_rot: int = _dir_to_orientation(dir, -PI / 2.0)
 	_set_floor_tile(top_pos, level_y, SLOPE_RESERVED_REGION, slope_floor_item_id, slope_rot)
 
-	for p in [top_pos, bot_pos]:
+	for p in slope_corridor:
 		committed_cells[_to_3d(p, level_y)] = SLOPE_RESERVED_REGION
 		committed_cells[_to_3d(p, level_y - 1)] = SLOPE_RESERVED_REGION
 
@@ -299,14 +285,12 @@ func _try_place_hub_slope(bounds: Rect2i, level_y: int) -> bool:
 	return true
 
 
-func _is_slope_clear(corridor_cells: Array[Vector2i], check_y: int, single_allowed_connection: Vector2i) -> bool:
+func _is_slope_clear(corridor_cells: Array[Vector2i], check_y: int, allowed_connection: Vector2i) -> bool:
 	for cell in corridor_cells:
 		for dx in range(-1, 2):
 			for dy in range(-1, 2):
 				var check_pos: Vector2i = cell + Vector2i(dx, dy)
-				if check_pos in corridor_cells:
-					continue
-				if committed_cells.has(_to_3d(check_pos, check_y)) and check_pos != single_allowed_connection:
+				if check_pos not in corridor_cells and committed_cells.has(_to_3d(check_pos, check_y)) and check_pos != allowed_connection:
 					return false
 	return true
 
@@ -336,7 +320,7 @@ func _connect_spoke_door(slot: Dictionary, region_id: int) -> Vector3i:
 		var hub_side: Vector2i = Vector2i(chosen.x, chosen.z) - dir
 		_carve_path(_find_closest_cell_in_region(hub_side, 0, level_y), hub_side, 0, hub_floor_item_id, level_y)
 
-	_set_floor_tile(Vector2i(chosen.x, chosen.z), chosen.y, region_id, door_floor_item_id)
+	_set_floor_tile(Vector2i(chosen.x, chosen.z), chosen.y, region_id, spoke_floor_item_id)
 	placed_doors.append(DoorData.new(chosen, region_id))
 	return chosen
 
@@ -373,11 +357,9 @@ func _is_step_valid(target_cells: Array[Vector2i], origin_cells: Array[Vector2i]
 		for dx in range(-1, 2):
 			for dy in range(-1, 2):
 				var n: Vector2i = cell + Vector2i(dx, dy)
-				var neighbor_3d := _to_3d(n, level_y)
+				var neighbor_3d: Vector3i = _to_3d(n, level_y)
 				if committed_cells.has(neighbor_3d):
-					if committed_cells[neighbor_3d] == SLOPE_RESERVED_REGION:
-						return false
-					if not allowed.has(n) and not origin_neighbors.has(n):
+					if committed_cells[neighbor_3d] == SLOPE_RESERVED_REGION or (not allowed.has(n) and not origin_neighbors.has(n)):
 						return false
 	return true
 
@@ -494,11 +476,11 @@ func _get_perp_dirs(dir: Vector2i) -> Array[Vector2i]:
 	return [perp, -perp]
 
 
-func _get_slope_orientation(dir: Vector2i) -> int:
+func _dir_to_orientation(dir: Vector2i, angle_offset: float = 0.0) -> int:
+	if not floor_gridmap: return 0
 	var target_fwd: Vector3 = Vector3(dir.x, 0, dir.y)
-	var angle: float = Vector3.FORWARD.signed_angle_to(target_fwd, Vector3.UP) - PI / 2
-	var basis: Basis = Basis.from_euler(Vector3(0, angle, 0))
-	return floor_gridmap.get_orthogonal_index_from_basis(basis) if floor_gridmap else 0
+	var angle: float = Vector3.FORWARD.signed_angle_to(target_fwd, Vector3.UP) + angle_offset
+	return floor_gridmap.get_orthogonal_index_from_basis(Basis(Vector3.UP, angle))
 
 
 func _to_3d(pos: Vector2i, y: int = 0) -> Vector3i:

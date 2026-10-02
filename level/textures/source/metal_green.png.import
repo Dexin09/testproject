@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dpwwhmace81ld"
-path.s3tc="res://.godot/imported/gravel.png-315533e96fcf96e97b95e73bcf7b2436.s3tc.ctex"
+uid="uid://bl3gvb7r52eyr"
+path.s3tc="res://.godot/imported/metal_green.png-88ec45124cb1bfda607746e90fc4078e.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/gravel.png"
-dest_files=["res://.godot/imported/gravel.png-315533e96fcf96e97b95e73bcf7b2436.s3tc.ctex"]
+source_file="res://level/textures/source/metal_green.png"
+dest_files=["res://.godot/imported/metal_green.png-88ec45124cb1bfda607746e90fc4078e.s3tc.ctex"]
 
 [params]
 

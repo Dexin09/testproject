@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://fvk53olurop0"
-path.s3tc="res://.godot/imported/corrugated_patchy.png-aead06e23389c739515c0f0718d6158c.s3tc.ctex"
+uid="uid://dfcfqmxeibqmg"
+path.s3tc="res://.godot/imported/planks_dark.png-0b2fc886eb7618b744cbb215ad534902.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/corrugated_patchy.png"
-dest_files=["res://.godot/imported/corrugated_patchy.png-aead06e23389c739515c0f0718d6158c.s3tc.ctex"]
+source_file="res://level/textures/source/planks_dark.png"
+dest_files=["res://.godot/imported/planks_dark.png-0b2fc886eb7618b744cbb215ad534902.s3tc.ctex"]
 
 [params]
 

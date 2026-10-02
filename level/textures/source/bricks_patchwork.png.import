@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dnvqrmgwd4pu0"
-path.s3tc="res://.godot/imported/tiles_checkered.png-48ec0ff107b590003cf757c810ac4f1d.s3tc.ctex"
+uid="uid://d1smdlftr1pyd"
+path.s3tc="res://.godot/imported/bricks_patchwork.png-510c53491b418edf1837b7dc1382f413.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/tiles_checkered.png"
-dest_files=["res://.godot/imported/tiles_checkered.png-48ec0ff107b590003cf757c810ac4f1d.s3tc.ctex"]
+source_file="res://level/textures/source/bricks_patchwork.png"
+dest_files=["res://.godot/imported/bricks_patchwork.png-510c53491b418edf1837b7dc1382f413.s3tc.ctex"]
 
 [params]
 

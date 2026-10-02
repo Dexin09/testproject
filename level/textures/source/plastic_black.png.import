@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dgtwtxgx1bsaw"
-path.s3tc="res://.godot/imported/plastic_dark.png-4086a6e6cf6ca65767cbea1b67e88e8d.s3tc.ctex"
+uid="uid://cr1unpxwa71ui"
+path.s3tc="res://.godot/imported/plastic_black.png-24ead446d99fbcbe08621c17a2a8f74a.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/plastic_dark.png"
-dest_files=["res://.godot/imported/plastic_dark.png-4086a6e6cf6ca65767cbea1b67e88e8d.s3tc.ctex"]
+source_file="res://level/textures/source/plastic_black.png"
+dest_files=["res://.godot/imported/plastic_black.png-24ead446d99fbcbe08621c17a2a8f74a.s3tc.ctex"]
 
 [params]
 

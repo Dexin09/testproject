@@ -7,12 +7,12 @@ extends Node3D
 @export var roof_gridmap: GridMap
 
 @export_group("Tiles")
-@export var WALL_ITEM_ID: int = 51
-@export var CORNER_ITEM_ID: int = 11
-@export var INNER_CORNER_ITEM_ID: int = 11
-@export var CROSS_ITEM_ID: int = 31
-@export var ROOF_ITEM_ID: int = -1
-@export var slope_floor_item_id: int = 33
+@export var WALL_ITEM_ID: int = 0
+@export var CORNER_ITEM_ID: int = 1
+@export var INNER_CORNER_ITEM_ID: int = 1
+@export var CROSS_ITEM_ID: int = 2
+@export var ROOF_ITEM_ID: int = 2
+@export var slope_floor_item_id: int = 3
 @export var slope_item_ids: Array[int] = []
 
 @export_group("Roof/Ceiling Settings")
@@ -23,10 +23,10 @@ extends Node3D
 @export_enum("0:0", "90:90", "180:180", "270:270") var straight_horizontal: int = 90
 @export_enum("0:0", "90:90", "180:180", "270:270") var straight_vertical: int = 180
 
-@export_enum("0:0", "90:90", "180:180", "270:270") var corner_top_left: int = 90
-@export_enum("0:0", "90:90", "180:180", "270:270") var corner_top_right: int = 0
-@export_enum("0:0", "90:90", "180:180", "270:270") var corner_bottom_right: int = 270
-@export_enum("0:0", "90:90", "180:180", "270:270") var corner_bottom_left: int = 180
+@export_enum("0:0", "90:90", "180:180", "270:270") var corner_top_left: int = 270
+@export_enum("0:0", "90:90", "180:180", "270:270") var corner_top_right: int = 180
+@export_enum("0:0", "90:90", "180:180", "270:270") var corner_bottom_right: int = 90
+@export_enum("0:0", "90:90", "180:180", "270:270") var corner_bottom_left: int = 0
 
 @export_enum("0:0", "90:90", "180:180", "270:270") var cross_diagonal_1: int = 0 
 @export_enum("0:0", "90:90", "180:180", "270:270") var cross_diagonal_2: int = 90
@@ -38,7 +38,7 @@ func run() -> void:
 	if floor_gridmap:
 		var cell_size := floor_gridmap.cell_size
 		if wall_gridmap:
-			wall_gridmap.position = floor_gridmap.position - Vector3(cell_size.x * 0.5, 0, cell_size.z * 0.5)
+			wall_gridmap.position = floor_gridmap.position - Vector3(cell_size.x * 0.5, -0.0625, cell_size.z * 0.5)
 		if roof_gridmap:
 			roof_gridmap.position = floor_gridmap.position
 

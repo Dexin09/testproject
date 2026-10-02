@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://wqkr0tgpt8c1"
-path.s3tc="res://.godot/imported/plastic_light.png-6a7eb019462ab0ee15f95ddf4f034127.s3tc.ctex"
+uid="uid://3xkpqblkgvpx"
+path.s3tc="res://.godot/imported/corrugated_wide.png-4dc8b5161493193d4fcad76121489140.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/plastic_light.png"
-dest_files=["res://.godot/imported/plastic_light.png-6a7eb019462ab0ee15f95ddf4f034127.s3tc.ctex"]
+source_file="res://level/textures/source/corrugated_wide.png"
+dest_files=["res://.godot/imported/corrugated_wide.png-4dc8b5161493193d4fcad76121489140.s3tc.ctex"]
 
 [params]
 

@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bl3gvb7r52eyr"
-path.s3tc="res://.godot/imported/metal_green.png-f88a9b39a696b712137d6f935b00585c.s3tc.ctex"
+uid="uid://fvk53olurop0"
+path.s3tc="res://.godot/imported/corrugated_patchy.png-a2dc77b49211e8c6a9ee1b3f69ab579d.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://level/textures/metal_green.png"
-dest_files=["res://.godot/imported/metal_green.png-f88a9b39a696b712137d6f935b00585c.s3tc.ctex"]
+source_file="res://level/textures/source/corrugated_patchy.png"
+dest_files=["res://.godot/imported/corrugated_patchy.png-a2dc77b49211e8c6a9ee1b3f69ab579d.s3tc.ctex"]
 
 [params]
 
