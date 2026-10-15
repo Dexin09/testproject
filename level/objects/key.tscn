@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://bhx4g6q38muy3"]
+
+[ext_resource type="Script" uid="uid://c7w8dx8vo0xlg" path="res://level/objects/key.gd" id="1_up4cr"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_acy7r"]
+radius = 0.333
+
+[sub_resource type="TextMesh" id="TextMesh_g3ryl"]
+text = "key"
+font_size = 32
+
+[node name="KeyArea" type="Area3D" unique_id=308546812]
+script = ExtResource("1_up4cr")
+
+[node name="CollisionShape" type="CollisionShape3D" parent="." unique_id=406407019]
+shape = SubResource("SphereShape3D_acy7r")
+
+[node name="MeshInstance" type="MeshInstance3D" parent="." unique_id=1191851795]
+mesh = SubResource("TextMesh_g3ryl")
+
+[connection signal="body_entered" from="." to="." method="_on_body_entered"]

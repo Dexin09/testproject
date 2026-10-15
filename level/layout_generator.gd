@@ -29,6 +29,24 @@ const CARDINAL_DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEF
 const SLOPE_RESERVED_REGION: int = -999
 const VENT_RESERVED_REGION: int = -998
 
+# Packed Scenes
+const PLAYER_SCENE: PackedScene = preload("res://player.tscn")
+const DOOR_SCENE: PackedScene = preload("res://level/objects/door.tscn")
+const ELEVATOR_SCENE: PackedScene = preload("res://level/objects/elevator.tscn")
+const KEY_SCENE: PackedScene = preload("res://level/objects/key.tscn")
+
+# Color palette for assigning key/door matching colors
+const KEY_COLORS: Array[Color] = [
+	Color.RED,
+	Color.GREEN,
+	Color.BLUE,
+	Color.YELLOW,
+	Color.MAGENTA,
+	Color.CYAN,
+	Color.ORANGE,
+	Color.PURPLE
+]
+
 var committed_cells: Dictionary = {}
 var trail: Array[Step] = []
 var placed_doors: Array[DoorData] = []
@@ -38,6 +56,7 @@ var hub_bounds: Rect2i
 var spoke_slots: Array[Dictionary] = []
 var elevator_pos: Vector2i
 var slope_placed: bool = false
+var spawned_nodes: Array[Node] = []
 
 class Step:
 	var pos: Vector2i; var dir: Vector2i; var width: int; var region_id: int; var level_y: int; var cells: Array[Vector2i]
@@ -45,8 +64,9 @@ class Step:
 		pos = p; dir = d; width = w; region_id = r; cells = cl; level_y = y
 
 class DoorData:
-	var pos: Vector3i; var key_index: int
-	func _init(p: Vector3i, idx: int) -> void: pos = p; key_index = idx
+	var pos: Vector3i; var key_index: int; var dir: Vector2i
+	func _init(p: Vector3i, idx: int, d: Vector2i = Vector2i.ZERO) -> void: 
+		pos = p; key_index = idx; dir = d
 
 class KeyData:
 	var pos: Vector3i; var key_index: int
@@ -59,7 +79,7 @@ func _ready() -> void:
 
 	if camera:
 		var hub_center: Vector2i = hub_bounds.get_center()
-		var center_world: Vector3 = floor_gridmap.map_to_local(_to_3d(hub_center)) if floor_gridmap else Vector3(hub_center.x * 2.0, 0.0, hub_center.y * 2.0)
+		var center_world: Vector3 = _map_to_world(_to_3d(hub_center))
 		camera.position = Vector3(center_world.x, camera.position.y, center_world.z)
 
 	if wall_generator and wall_generator.has_method("run"):
@@ -108,6 +128,7 @@ func generate_tree_walker_layout() -> void:
 		region_id += 1
 
 	_assign_keys(active_slots.size())
+	_spawn_level_entities()
 
 
 func _generate_hub(bounds: Rect2i) -> void:
@@ -317,7 +338,7 @@ func _connect_spoke_door(slot: Dictionary, region_id: int) -> Vector3i:
 		_carve_path(_find_closest_cell_in_region(hub_side, 0, level_y), hub_side, 0, hub_floor_item_id, level_y)
 
 	_set_floor_tile(Vector2i(chosen.x, chosen.z), chosen.y, region_id, spoke_floor_item_id)
-	placed_doors.append(DoorData.new(chosen, region_id))
+	placed_doors.append(DoorData.new(chosen, region_id, dir))
 	return chosen
 
 
@@ -417,16 +438,108 @@ func _carve_path(from_cell: Vector2i, to_cell: Vector2i, region_id: int, floor_i
 
 func _assign_keys(active_spoke_count: int) -> void:
 	placed_keys.clear()
-	var spoke_order: Array = range(1, active_spoke_count + 1)
-	spoke_order.shuffle()
-	var chain: Array = [0] + spoke_order
+	var total_rooms: int = active_spoke_count + 1
+	var total_keys: int = total_rooms
 
-	for i in range(chain.size() - 1):
-		var dead_ends: Array = dead_ends_by_region.get(chain[i], [])
-		if not dead_ends.is_empty():
-			var key_pos: Vector3i = dead_ends.pick_random()
-			dead_ends.erase(key_pos)
-			placed_keys.append(KeyData.new(key_pos, chain[i + 1]))
+	var keys_to_place: Array[int] = []
+	for i in range(total_keys):
+		keys_to_place.append(i)
+
+	keys_to_place.shuffle()
+
+	for room_region in range(total_rooms):
+		var target_key_idx: int = keys_to_place[room_region]
+		var spawn_cell: Vector3i = _get_random_cell_in_region(room_region)
+		placed_keys.append(KeyData.new(spawn_cell, target_key_idx))
+
+
+func _get_random_cell_in_region(region_id: int) -> Vector3i:
+	var dead_ends: Array = dead_ends_by_region.get(region_id, [])
+	if not dead_ends.is_empty():
+		var chosen: Vector3i = dead_ends.pick_random()
+		dead_ends.erase(chosen)
+		return chosen
+
+	var fallback_cells: Array[Vector3i] = []
+	for cell: Vector3i in committed_cells:
+		if committed_cells[cell] == region_id:
+			fallback_cells.append(cell)
+
+	if not fallback_cells.is_empty():
+		return fallback_cells.pick_random()
+
+	return _to_3d(elevator_pos, 0)
+
+
+func _spawn_level_entities() -> void:
+	# 1. Spawn Elevator
+	if ELEVATOR_SCENE:
+		var elevator_instance: Node3D = ELEVATOR_SCENE.instantiate() as Node3D
+		if elevator_instance:
+			add_child(elevator_instance)
+			elevator_instance.global_position = _map_to_world(_to_3d(elevator_pos, 0))
+			spawned_nodes.append(elevator_instance)
+
+	# 2. Spawn Player adjacent to Elevator
+	if PLAYER_SCENE:
+		var player_instance: Node3D = PLAYER_SCENE.instantiate() as Node3D
+		if player_instance:
+			add_child(player_instance)
+			var spawn_cell: Vector3i = _to_3d(elevator_pos + Vector2i.UP, 0)
+			player_instance.global_position = _map_to_world(spawn_cell)
+			spawned_nodes.append(player_instance)
+
+	# 3. Spawn Doors
+	if DOOR_SCENE:
+		for door_data in placed_doors:
+			var door_instance: Node3D = DOOR_SCENE.instantiate() as Node3D
+			if door_instance:
+				add_child(door_instance)
+				door_instance.global_position = _map_to_world(door_data.pos)
+				
+				# Orient door to match corridor layout
+				var angle: float = Vector3.FORWARD.signed_angle_to(Vector3(door_data.dir.x, 0.0, door_data.dir.y), Vector3.UP)
+				door_instance.rotation.y = angle
+
+				# Color door and apply material tint
+				var key_color: Color = KEY_COLORS[door_data.key_index % KEY_COLORS.size()]
+				_apply_color_to_node(door_instance, key_color)
+				spawned_nodes.append(door_instance)
+
+	# 4. Spawn Keys (Lifted 1m)
+	if KEY_SCENE:
+		for key_data in placed_keys:
+			var key_instance: Node3D = KEY_SCENE.instantiate() as Node3D
+			if key_instance:
+				add_child(key_instance)
+				var key_pos: Vector3 = _map_to_world(key_data.pos) + Vector3(0.0, 1.0, 0.0)
+				key_instance.global_position = key_pos
+				
+				# Color key and apply material tint
+				var key_color: Color = KEY_COLORS[key_data.key_index % KEY_COLORS.size()]
+				_apply_color_to_node(key_instance, key_color)
+				spawned_nodes.append(key_instance)
+
+
+func _apply_color_to_node(target: Node3D, color: Color) -> void:
+	target.set("key_colour", color)
+	
+	# Recursively assign color to mesh materials if exported property isn't auto-applied by node
+	var meshes: Array[Node] = target.find_children("*", "MeshInstance3D")
+	for mesh_node in meshes:
+		var mesh_inst: MeshInstance3D = mesh_node as MeshInstance3D
+		if mesh_inst:
+			var mat: StandardMaterial3D = mesh_inst.get_surface_override_material(0) as StandardMaterial3D
+			if not mat:
+				mat = StandardMaterial3D.new()
+				mesh_inst.set_surface_override_material(0, mat)
+			mat.albedo_color = color
+
+
+func _map_to_world(map_pos: Vector3i) -> Vector3:
+	if floor_gridmap:
+		return floor_gridmap.map_to_local(map_pos)
+	return Vector3(map_pos.x * 2.0, map_pos.y * 2.0, map_pos.z * 2.0)
 
 
 func _mark_current_dead_end() -> void:
@@ -480,3 +593,8 @@ func _clear_state() -> void:
 	trail.clear()
 	slope_placed = false
 	elevator_pos = Vector2i.MIN
+
+	for node in spawned_nodes:
+		if is_instance_valid(node):
+			node.queue_free()
+	spawned_nodes.clear()
