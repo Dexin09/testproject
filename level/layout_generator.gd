@@ -3,6 +3,7 @@ extends Node3D
 
 @export var floor_gridmap: GridMap
 @export var wall_generator: WallGenerator
+@export var player: Player
 @export var camera: Node
 
 @export_group("Floor Item Setup")
@@ -64,13 +65,14 @@ class Step:
 		pos = p; dir = d; width = w; region_id = r; cells = cl; level_y = y
 
 class DoorData:
-	var pos: Vector3i; var key_index: int; var dir: Vector2i
-	func _init(p: Vector3i, idx: int, d: Vector2i = Vector2i.ZERO) -> void: 
-		pos = p; key_index = idx; dir = d
+	var pos: Vector3i; var key_index: int; var dir: Vector2i; var target_region: int
+	func _init(p: Vector3i, idx: int, d: Vector2i = Vector2i.ZERO, region: int = 0) -> void: 
+		pos = p; key_index = idx; dir = d; target_region = region
 
 class KeyData:
-	var pos: Vector3i; var key_index: int
-	func _init(p: Vector3i, idx: int) -> void: pos = p; key_index = idx
+	var pos: Vector3i; var key_index: int; var region_id: int
+	func _init(p: Vector3i, idx: int, r_id: int = 0) -> void: 
+		pos = p; key_index = idx; region_id = r_id
 
 
 func _ready() -> void:
@@ -94,8 +96,10 @@ func _calculate_cross_bounds() -> void:
 	for level_y in [0, -1]:
 		for dir in CARDINAL_DIRS:
 			var is_vert: bool = (dir.y != 0)
-			var pos: Vector2i = Vector2i(hub_bounds.position.x if is_vert else (hub_origin.x - 1 - spoke_depth if dir == Vector2i.LEFT else hub_bounds.end.x + 1),
-				hub_origin.y - 1 - spoke_depth if dir == Vector2i.UP else (hub_bounds.end.y + 1 if is_vert else hub_bounds.position.y))
+			var pos: Vector2i = Vector2i(
+				hub_bounds.position.x if is_vert else (hub_origin.x - 1 - spoke_depth if dir == Vector2i.LEFT else hub_bounds.end.x + 1),
+				hub_origin.y - 1 - spoke_depth if dir == Vector2i.UP else (hub_bounds.end.y + 1 if is_vert else hub_bounds.position.y)
+			)
 			var size: Vector2i = Vector2i(hub_size.x, spoke_depth) if is_vert else Vector2i(spoke_depth, hub_size.y)
 			var seam: Array = [hub_bounds.position.x, hub_bounds.end.x] if is_vert else [hub_bounds.position.y, hub_bounds.end.y]
 			spoke_slots.append({"dir": dir, "level_y": level_y, "bounds": Rect2i(pos, size), "seam_range": seam})
@@ -127,7 +131,7 @@ func generate_tree_walker_layout() -> void:
 		_generate_sector(rect, region_id, spoke_floor_item_id, target, door_2d + dir, dir, door_3d.y, [door_2d])
 		region_id += 1
 
-	_assign_keys(active_slots.size())
+	_assign_keys_and_doors_sequentially(active_slots.size())
 	_spawn_level_entities()
 
 
@@ -338,7 +342,8 @@ func _connect_spoke_door(slot: Dictionary, region_id: int) -> Vector3i:
 		_carve_path(_find_closest_cell_in_region(hub_side, 0, level_y), hub_side, 0, hub_floor_item_id, level_y)
 
 	_set_floor_tile(Vector2i(chosen.x, chosen.z), chosen.y, region_id, spoke_floor_item_id)
-	placed_doors.append(DoorData.new(chosen, region_id, dir))
+	# Key index and assignment are handled sequentially after sector generation
+	placed_doors.append(DoorData.new(chosen, -1, dir, region_id))
 	return chosen
 
 
@@ -435,24 +440,121 @@ func _carve_path(from_cell: Vector2i, to_cell: Vector2i, region_id: int, floor_i
 		elif curr.y != to_cell.y: curr.y += signi(to_cell.y - curr.y)
 		_set_floor_tile(curr, level_y, region_id, floor_id)
 
-
-func _assign_keys(active_spoke_count: int) -> void:
+func _assign_keys_and_doors_sequentially(active_spoke_count: int) -> void:
 	placed_keys.clear()
-	var total_rooms: int = active_spoke_count + 1
-	var total_keys: int = total_rooms
+	
+	# Shuffle spoke region order to create a unique level sequence each run
+	var region_chain: Array[int] = []
+	for r in range(1, active_spoke_count + 1):
+		region_chain.append(r)
+	region_chain.shuffle()
 
-	var keys_to_place: Array[int] = []
-	for i in range(total_keys):
-		keys_to_place.append(i)
+	# Region Sequence: Hub (Region 0) -> Chain[0] -> Chain[1] -> ... -> Chain[N-1]
+	var progression_regions: Array[int] = [0]
+	progression_regions.append_array(region_chain)
 
-	keys_to_place.shuffle()
+	# Assign doors to lock each next region in the progression chain
+	for i in range(progression_regions.size() - 1):
+		var target_region: int = progression_regions[i + 1]
+		var key_index: int = i # Unique Key/Door Pair ID
+		
+		for door in placed_doors:
+			if door.target_region == target_region:
+				door.key_index = key_index
+				break
 
-	for room_region in range(total_rooms):
-		var target_key_idx: int = keys_to_place[room_region]
-		var spawn_cell: Vector3i = _get_random_cell_in_region(room_region)
-		placed_keys.append(KeyData.new(spawn_cell, target_key_idx))
+		# Place Key inside current region to unlock Door entering the next region
+		var source_region: int = progression_regions[i]
+		var key_cell: Vector3i = _get_random_cell_in_region(source_region)
+		placed_keys.append(KeyData.new(key_cell, key_index, source_region))
+
+	# Final Key inside the last spoke region (used to activate the exit/elevator)
+	var final_region: int = progression_regions.back()
+	var final_key_cell: Vector3i = _get_random_cell_in_region(final_region)
+	placed_keys.append(KeyData.new(final_key_cell, progression_regions.size() - 1, final_region))
 
 
+func _spawn_level_entities() -> void:
+	var created_player: Player = player
+	var elevator_world_pos: Vector3 = Vector3.ZERO
+
+	# 1. Spawn Elevator
+	if ELEVATOR_SCENE:
+		var elevator_instance: Node3D = ELEVATOR_SCENE.instantiate() as Node3D
+		if elevator_instance:
+			add_child(elevator_instance)
+			elevator_world_pos = _map_to_world(_to_3d(elevator_pos, 0))
+			elevator_instance.global_position = elevator_world_pos
+			spawned_nodes.append(elevator_instance)
+
+	# 2. Spawn Player adjacent to Elevator
+	if PLAYER_SCENE:
+		var player_instance: Node3D = PLAYER_SCENE.instantiate() as Node3D
+		if player_instance:
+			add_child(player_instance)
+			var spawn_cell: Vector3i = _to_3d(elevator_pos + Vector2i.UP, 0)
+			player_instance.global_position = _map_to_world(spawn_cell)
+			spawned_nodes.append(player_instance)
+			if player_instance is Player:
+				created_player = player_instance as Player
+
+	# 3. Clear existing objectives on target player reference
+	if created_player and "objectives" in created_player:
+		created_player.objectives.clear()
+
+	# Sort keys and doors by index to build sequential objective list
+	var sorted_keys: Array[KeyData] = placed_keys.duplicate()
+	sorted_keys.sort_custom(func(a, b): return a.key_index < b.key_index)
+
+	var sorted_doors: Array[DoorData] = placed_doors.duplicate()
+	sorted_doors.sort_custom(func(a, b): return a.key_index < b.key_index)
+
+	# 4. Spawn Keys & Register Objectives
+	if KEY_SCENE:
+		for key_data in sorted_keys:
+			var key_instance: Node3D = KEY_SCENE.instantiate() as Node3D
+			if key_instance:
+				add_child(key_instance)
+				var key_pos: Vector3 = _map_to_world(key_data.pos) + Vector3(0.0, 1.0, 0.0)
+				key_instance.global_position = key_pos
+				
+				var key_color: Color = KEY_COLORS[key_data.key_index % KEY_COLORS.size()]
+				_apply_color_to_node(key_instance, key_color)
+				spawned_nodes.append(key_instance)
+
+				# Push key position objective to player
+				if created_player and "objectives" in created_player:
+					created_player.objectives.append(key_pos)
+
+			# Push corresponding door position objective right after the key (if door exists)
+			var matching_doors: Array = sorted_doors.filter(func(d): return d.key_index == key_data.key_index)
+			if not matching_doors.is_empty() and created_player and "objectives" in created_player:
+				var door_world_pos: Vector3 = _map_to_world(matching_doors[0].pos)
+				created_player.objectives.append(door_world_pos)
+
+	# 5. Add Final Objective: Return to Elevator
+	if created_player and "objectives" in created_player:
+		created_player.objectives.append(elevator_world_pos)
+
+	# 6. Spawn Doors
+	if DOOR_SCENE:
+		for door_data in placed_doors:
+			var door_instance: Node3D = DOOR_SCENE.instantiate() as Node3D
+			if door_instance:
+				add_child(door_instance)
+				door_instance.global_position = _map_to_world(door_data.pos)
+				
+				# Orient door to match corridor layout
+				var angle: float = Vector3.FORWARD.signed_angle_to(Vector3(door_data.dir.x, 0.0, door_data.dir.y), Vector3.UP)
+				door_instance.rotation.y = angle
+
+				# Color door and apply material tint
+				if door_data.key_index >= 0:
+					var key_color: Color = KEY_COLORS[door_data.key_index % KEY_COLORS.size()]
+					_apply_color_to_node(door_instance, key_color)
+				spawned_nodes.append(door_instance)
+				
+				
 func _get_random_cell_in_region(region_id: int) -> Vector3i:
 	var dead_ends: Array = dead_ends_by_region.get(region_id, [])
 	if not dead_ends.is_empty():
@@ -469,56 +571,6 @@ func _get_random_cell_in_region(region_id: int) -> Vector3i:
 		return fallback_cells.pick_random()
 
 	return _to_3d(elevator_pos, 0)
-
-
-func _spawn_level_entities() -> void:
-	# 1. Spawn Elevator
-	if ELEVATOR_SCENE:
-		var elevator_instance: Node3D = ELEVATOR_SCENE.instantiate() as Node3D
-		if elevator_instance:
-			add_child(elevator_instance)
-			elevator_instance.global_position = _map_to_world(_to_3d(elevator_pos, 0))
-			spawned_nodes.append(elevator_instance)
-
-	# 2. Spawn Player adjacent to Elevator
-	if PLAYER_SCENE:
-		var player_instance: Node3D = PLAYER_SCENE.instantiate() as Node3D
-		if player_instance:
-			add_child(player_instance)
-			var spawn_cell: Vector3i = _to_3d(elevator_pos + Vector2i.UP, 0)
-			player_instance.global_position = _map_to_world(spawn_cell)
-			spawned_nodes.append(player_instance)
-
-	# 3. Spawn Doors
-	if DOOR_SCENE:
-		for door_data in placed_doors:
-			var door_instance: Node3D = DOOR_SCENE.instantiate() as Node3D
-			if door_instance:
-				add_child(door_instance)
-				door_instance.global_position = _map_to_world(door_data.pos)
-				
-				# Orient door to match corridor layout
-				var angle: float = Vector3.FORWARD.signed_angle_to(Vector3(door_data.dir.x, 0.0, door_data.dir.y), Vector3.UP)
-				door_instance.rotation.y = angle
-
-				# Color door and apply material tint
-				var key_color: Color = KEY_COLORS[door_data.key_index % KEY_COLORS.size()]
-				_apply_color_to_node(door_instance, key_color)
-				spawned_nodes.append(door_instance)
-
-	# 4. Spawn Keys (Lifted 1m)
-	if KEY_SCENE:
-		for key_data in placed_keys:
-			var key_instance: Node3D = KEY_SCENE.instantiate() as Node3D
-			if key_instance:
-				add_child(key_instance)
-				var key_pos: Vector3 = _map_to_world(key_data.pos) + Vector3(0.0, 1.0, 0.0)
-				key_instance.global_position = key_pos
-				
-				# Color key and apply material tint
-				var key_color: Color = KEY_COLORS[key_data.key_index % KEY_COLORS.size()]
-				_apply_color_to_node(key_instance, key_color)
-				spawned_nodes.append(key_instance)
 
 
 func _apply_color_to_node(target: Node3D, color: Color) -> void:

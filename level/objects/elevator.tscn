@@ -1,3 +1,7 @@
 [gd_scene format=3 uid="uid://ixkgp75v6x33"]
 
-[node name="ElevatorArea" unique_id=1891722565]
+[ext_resource type="PackedScene" uid="uid://c8d63at5mv0q8" path="res://level/objects/door.tscn" id="1_uuuf0"]
+[ext_resource type="Script" uid="uid://071e1mfpd1yh" path="res://level/objects/elevator.gd" id="2_052ey"]
+
+[node name="ElevatorArea" unique_id=1891722565 instance=ExtResource("1_uuuf0")]
+script = ExtResource("2_052ey")

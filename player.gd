@@ -18,6 +18,9 @@ var _pitch: float = 0.0
 var _yaw: float = 0.0
 var crouching: bool = false
 @onready var camera: Camera3D = $Camera
+@onready var marker: Node3D = $Camera/ObjectiveMarker
+
+var objectives: Array[Vector3] = []
 
 func _ready() -> void:
 	_pitch = rotation.x
@@ -73,3 +76,17 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0, current_speed)
 
 	move_and_slide()
+	_update_objective_marker()
+
+
+func _update_objective_marker() -> void:
+	if not marker or objectives.is_empty():
+		if marker:
+			marker.visible = false
+		return
+
+	marker.visible = true
+	
+	var target_pos: Vector3 = objectives[0]
+	if not marker.global_position.is_equal_approx(target_pos):
+		marker.look_at(target_pos, Vector3.UP)

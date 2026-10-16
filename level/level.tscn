@@ -2,13 +2,13 @@
 
 [ext_resource type="MeshLibrary" uid="uid://b7xqx4sxlrujq" path="res://level/meshlibs/meshes_floors.meshlib" id="1_ktfr2"]
 [ext_resource type="MeshLibrary" uid="uid://cyauoytu4rhqi" path="res://level/meshlibs/meshes_walls.meshlib" id="2_44x8d"]
-[ext_resource type="PackedScene" uid="uid://c8d63at5mv0q8" path="res://level/objects/door.tscn" id="6_0v1st"]
 [ext_resource type="Script" uid="uid://bfmcgosrn18jd" path="res://level/wall_generator.gd" id="6_44x8d"]
 [ext_resource type="Script" uid="uid://dnvsorrc7j0r8" path="res://level/layout_generator.gd" id="6_ivpvi"]
-[ext_resource type="PackedScene" uid="uid://btniskpw8is6r" path="res://player.tscn" id="7_ivpvi"]
-[ext_resource type="Script" uid="uid://ce70j5d0prvsl" path="res://freecam.gd" id="8_0v1st"]
 
 [sub_resource type="Environment" id="Environment_yf5fn"]
+fog_enabled = true
+fog_light_color = Color(0.0627451, 0.0627451, 0.0627451, 1)
+fog_density = 0.25
 
 [node name="Level" type="Node3D" unique_id=350795594]
 
@@ -33,7 +33,9 @@ cell_center_y = false
 script = ExtResource("6_ivpvi")
 floor_gridmap = NodePath("../FloorGridMap")
 wall_generator = NodePath("../WallGenerator")
-camera = NodePath("../Freecam")
+camera = NodePath("")
+hub_size = Vector2i(12, 12)
+spoke_depth = 6
 metadata/_custom_type_script = "uid://dnvsorrc7j0r8"
 
 [node name="WallGenerator" type="Node3D" parent="." unique_id=1301470454 node_paths=PackedStringArray("floor_gridmap", "wall_gridmap")]
@@ -41,21 +43,3 @@ script = ExtResource("6_44x8d")
 floor_gridmap = NodePath("../FloorGridMap")
 wall_gridmap = NodePath("../WallGridMap")
 metadata/_custom_type_script = "uid://bfmcgosrn18jd"
-
-[node name="Freecam" type="Camera3D" parent="." unique_id=1450178939]
-visible = false
-script = ExtResource("8_0v1st")
-metadata/_custom_type_script = "uid://ce70j5d0prvsl"
-
-[node name="OmniLight" type="OmniLight3D" parent="Freecam" unique_id=1172728830]
-shadow_enabled = true
-omni_range = 64.0
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1546057397]
-transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 0, 0)
-shadow_enabled = true
-
-[node name="Area" parent="." unique_id=1891722565 instance=ExtResource("6_0v1st")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
-
-[node name="CharacterBody" parent="." unique_id=1203490793 instance=ExtResource("7_ivpvi")]

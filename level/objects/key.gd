@@ -5,6 +5,7 @@ extends Area3D
 func _on_body_entered(body: Node3D) -> void:
 	if body is Player:
 		body.keys.append(key_colour)
+		body.objectives.pop_front()
 		queue_free()
 
 func _process(delta: float) -> void:

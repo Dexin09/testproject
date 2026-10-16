@@ -6,6 +6,14 @@
 radius = 0.333
 height = 1.7
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4flbx"]
+transparency = 1
+albedo_color = Color(1, 0.7529412, 0, 0.003921569)
+
+[sub_resource type="PrismMesh" id="PrismMesh_4flbx"]
+material = SubResource("StandardMaterial3D_4flbx")
+size = Vector3(0.063, 0.063, 0.016)
+
 [node name="Player" type="CharacterBody3D" unique_id=1203490793]
 script = ExtResource("1_4joeo")
 
@@ -18,7 +26,22 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0.1)
 current = true
 fov = 90.0
 
+[node name="ObjectiveMarker" type="Node3D" parent="Camera" unique_id=1435747011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+
+[node name="MeshInstance" type="MeshInstance3D" parent="Camera/ObjectiveMarker" unique_id=713976359]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, -1)
+mesh = SubResource("PrismMesh_4flbx")
+
+[node name="SpotLight" type="SpotLight3D" parent="Camera" unique_id=247579018]
+light_energy = 4.0
+spot_range = 16.0
+spot_angle = 30.0
+
 [node name="OmniLight" type="OmniLight3D" parent="." unique_id=2044220333]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 1, -0.25)
+light_color = Color(1, 0.9411765, 0.8784314, 1)
+light_energy = 2.0
+light_size = 0.5
 shadow_enabled = true
 omni_range = 16.0
