@@ -12,11 +12,14 @@ extends CharacterBody3D
 @export var capture_mouse_on_start: bool = true
 @export var stand_height: float = 1.5
 @export var crouch_height: float = 0.8
+@export var freecam_speed: float = 12.0
 
 var keys: Array[Color] = []
 var _pitch: float = 0.0
 var _yaw: float = 0.0
 var crouching: bool = false
+var is_freecam: bool = false
+
 @onready var camera: Camera3D = $Camera
 @onready var marker: Node3D = $Camera/ObjectiveMarker
 
@@ -36,15 +39,32 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		_yaw -= event.relative.x * mouse_sensitivity
-		_pitch -= event.relative.y * mouse_sensitivity
-		_pitch = clamp(_pitch, deg_to_rad(-89.0), deg_to_rad(89.0))
+	if event.is_action_pressed("camera_mode"):
+		is_freecam = not is_freecam
+		if not is_freecam:
+			# Reset camera transform local to player body when returning
+			camera.transform = Transform3D.IDENTITY
+			camera.position.y = crouch_height if crouching else stand_height
 
-		rotation = Vector3(0.0, _yaw, 0.0)
-		camera.rotation = Vector3(_pitch, 0.0, 0.0)
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		if is_freecam:
+			# Rotate camera independently in 3D world space
+			camera.rotate_y(-event.relative.x * mouse_sensitivity)
+			camera.rotate_object_local(Vector3.RIGHT, -event.relative.y * mouse_sensitivity)
+		else:
+			_yaw -= event.relative.x * mouse_sensitivity
+			_pitch -= event.relative.y * mouse_sensitivity
+			_pitch = clamp(_pitch, deg_to_rad(-89.0), deg_to_rad(89.0))
+
+			rotation = Vector3(0.0, _yaw, 0.0)
+			camera.rotation = Vector3(_pitch, 0.0, 0.0)
 
 func _physics_process(delta: float) -> void:
+	if is_freecam:
+		_process_freecam(delta)
+		_update_objective_marker()
+		return
+
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 
@@ -78,6 +98,16 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_update_objective_marker()
 
+func _process_freecam(delta: float) -> void:
+	var input_dir = Input.get_vector("move_left", "move_right", "move_forwards", "move_backwards")
+	var up_down := 0.0
+	if Input.is_action_pressed("ui_accept"):
+		up_down += 1.0
+	if Input.is_action_pressed("crouch"):
+		up_down -= 1.0
+
+	var move_dir = (camera.global_transform.basis * Vector3(input_dir.x, up_down, input_dir.y)).normalized()
+	camera.global_position += move_dir * freecam_speed * delta
 
 func _update_objective_marker() -> void:
 	if not marker or objectives.is_empty():
